@@ -1731,13 +1731,17 @@ const INSTALL={prompt:null};
 const ONPAGES=/\.github\.io$/.test(location.hostname)||location.hostname==='localhost';
 addEventListener('beforeinstallprompt',e=>{e.preventDefault();INSTALL.prompt=e});
 if('serviceWorker' in navigator&&location.protocol==='https:'&&/\.github\.io$/.test(location.hostname)){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
+// If anything breaks, show a friendly box (with the error text to screenshot) instead of a frozen screen.
+function showCrash(msg){if(document.getElementById('crashbox'))return;document.body.insertAdjacentHTML('beforeend',`<div id="crashbox" style="position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:99999;max-width:min(560px,calc(100vw - 32px));background:#231713;color:#f5e9df;border:2px solid #ff7d45;border-radius:12px;padding:14px 16px;font:15px/1.4 sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.5)"><b>Oops, something went wrong.</b> Try Reload. If it happens again, tap "Reset game" (this clears your saved progress).<div style="margin:8px 0;font:12px monospace;color:#f5c24f;word-break:break-word">${String(msg).replace(/[<>&]/g,'').slice(0,200)}</div><button onclick="location.reload()" style="margin-right:8px;padding:8px 14px;border-radius:8px;border:0;background:#ff7d45;color:#140D0B;font-weight:700">Reload</button><button onclick="try{Object.keys(localStorage).filter(k=>/^rf/.test(k)).forEach(k=>localStorage.removeItem(k))}catch(e){};if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(r=>r.forEach(x=>x.unregister()));if(window.caches)caches.keys().then(k=>k.forEach(x=>caches.delete(x)));setTimeout(()=>location.reload(),400)" style="padding:8px 14px;border-radius:8px;border:1px solid #ff7d45;background:none;color:#f5e9df">Reset game</button></div>`)}
+addEventListener('error',e=>{if(e.message)showCrash(e.message)});
+addEventListener('unhandledrejection',e=>{const m=String(e.reason&&e.reason.message||e.reason||'');if(!/fetch|network|load|abort|play\(\)|NotAllowed/i.test(m))showCrash(m)});
 function start(){
   modal.hidden=true;
   const ok=typeof THREE!=='undefined'&&world.init();
   if(!ok)document.body.insertAdjacentHTML('afterbegin','<p style="position:fixed;top:8px;left:16px;z-index:30;color:#f5c24f;font-size:12px">The 3D view needs WebGL, which this device or browser has turned off.</p>');
   title();refreshNasa();renderGfx();renderMusic();
 }
-start();
+try{start()}catch(e){showCrash(e.message)}
 </script>
 
 </body>
