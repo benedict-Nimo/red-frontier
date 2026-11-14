@@ -1,8 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Red Frontier: a free Mars survival game for kids. Help Astro survive a crash on Mars by solving real Martian problems. NASA Space Apps 2026.">
+<meta name="theme-color" content="#140D0B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Red Frontier">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Red Frontier</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>@font-face{font-family:'Chakra Petch';font-weight:500;font-display:swap;src:url(fonts/chakra-petch-latin-500-normal.woff2) format('woff2')}@font-face{font-family:'Chakra Petch';font-weight:600;font-display:swap;src:url(fonts/chakra-petch-latin-600-normal.woff2) format('woff2')}@font-face{font-family:'Chakra Petch';font-weight:700;font-display:swap;src:url(fonts/chakra-petch-latin-700-normal.woff2) format('woff2')}@font-face{font-family:'Atkinson Hyperlegible';font-weight:400;font-display:swap;src:url(fonts/atkinson-hyperlegible-latin-400-normal.woff2) format('woff2')}@font-face{font-family:'Atkinson Hyperlegible';font-weight:700;font-display:swap;src:url(fonts/atkinson-hyperlegible-latin-700-normal.woff2) format('woff2')}@font-face{font-family:'JetBrains Mono';font-weight:400;font-display:swap;src:url(fonts/jetbrains-mono-latin-400-normal.woff2) format('woff2')}@font-face{font-family:'JetBrains Mono';font-weight:600;font-display:swap;src:url(fonts/jetbrains-mono-latin-600-normal.woff2) format('woff2')}html,body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}</style>
+</head>
+<body>
 <style>
 /* Layout: full-bleed 3D Mars world you walk through; HUD pinned to the four corners
    (level + tasks top-left, MAP top-right, D-pad bottom-left, action buttons bottom-right, tool belt bottom-centre).
@@ -268,7 +282,7 @@ body.flash-white::after{background:rgba(220,240,255,.55);opacity:1;transition:no
       <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7l8-3 10 3 8-3v21l-8 3-10-3-8 3z"/><path d="M11 4v21M21 7v21"/><circle cx="16" cy="14" r="2.4" fill="#ff7d45" stroke="none"/></svg>
       MAP<span class="cnt" id="mapcount">0 left</span></button>
     <button id="manbtn" data-act="manual" aria-label="Open the manual"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 6c4-2 8-2 11 1 3-3 7-3 11-1v20c-4-2-8-2-11 1-3-3-7-3-11-1z"/><path d="M16 7v20"/></svg>MANUAL<span class="cnt" id="mancount">0/12</span></button>
-    <div id="cornerSmall"><button class="cbtn" data-act="dataroom">NASA data</button><button class="cbtn" id="soundbtn" data-act="sound" aria-pressed="true">Sound on</button><button class="cbtn" data-act="help">Help</button></div>
+    <div id="cornerSmall"><button class="cbtn" data-act="dataroom">NASA data</button><button class="cbtn" data-act="gfx">Graphics: Auto</button><button class="cbtn" id="soundbtn" data-act="sound" aria-pressed="true">Sound on</button><button class="cbtn" data-act="help">Help</button></div>
   </div>
   <div id="wx" class="panel pad-t"></div>
   <div id="timer" class="panel pad-t" hidden><div class="lbl" style="color:var(--bad)">Solar storm arrives in</div><div class="t" id="timerv">3:00</div></div>
@@ -283,7 +297,7 @@ body.flash-white::after{background:rgba(220,240,255,.55);opacity:1;transition:no
 <div id="toast" role="status"></div>
 <div id="modal"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="vendor/three.min.js"></script>
 <script>
 'use strict';
 /* =====================================================================
@@ -682,6 +696,10 @@ function taskPos(t){
   return t.at}
 function remaining(){return G?levelTasks(G.level).filter(t=>!G.done[t.id]):[]}
 
+const COARSE=matchMedia('(pointer: coarse)').matches||Math.min(innerWidth,innerHeight)<700;
+const QUAL={high:{pr:2,shadow:2048,soft:true,parts:1},medium:{pr:1.25,shadow:1024,soft:false,parts:.6},low:{pr:.85,shadow:0,soft:false,parts:.3}};
+const QS={pref:(()=>{try{return localStorage.getItem('rf-gfx')||'auto'}catch(e){return 'auto'}})(),name:'high',fr:0,t0:0};
+function renderGfx(){document.querySelectorAll('[data-act=gfx]').forEach(b=>b.textContent=`Graphics: ${QS.pref==='auto'?'Auto ('+QS.name+')':QS.pref[0].toUpperCase()+QS.pref.slice(1)}`)}
 /* =====================================================================
    3D WORLD
    ===================================================================== */
@@ -705,12 +723,13 @@ const world=(()=>{
   const sh=g=>{g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});return g};
   const at=(g,x,z,dy=0)=>{g.position.set(x,H(x,z)+dy,z);return g};
   function init(){
-    try{R=new THREE.WebGLRenderer({canvas:cv,antialias:true})}catch(e){return false}
-    R.setPixelRatio(Math.min(devicePixelRatio,2));R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
+    QS.name=QS.pref==='auto'?(COARSE?'medium':'high'):QS.pref;
+    try{R=new THREE.WebGLRenderer({canvas:cv,antialias:QS.name==='high'&&!COARSE,powerPreference:'high-performance'})}catch(e){return false}
+    R.setPixelRatio(Math.min(devicePixelRatio,QUAL[QS.name].pr));R.shadowMap.enabled=QUAL[QS.name].shadow>0;R.shadowMap.type=QUAL[QS.name].soft?THREE.PCFSoftShadowMap:THREE.PCFShadowMap;
     scene=new THREE.Scene();scene.fog=new THREE.Fog(0xd7a676,70,240);
     cam=new THREE.PerspectiveCamera(50,1,.1,1200);
     hemi=new THREE.HemisphereLight(0xffe4c8,0x5a2a18,.55);scene.add(hemi);
-    sunL=new THREE.DirectionalLight(0xfff0dc,.95);sunL.castShadow=true;sunL.shadow.mapSize.set(2048,2048);
+    sunL=new THREE.DirectionalLight(0xfff0dc,.95);sunL.castShadow=QUAL[QS.name].shadow>0;sunL.shadow.mapSize.set(QUAL[QS.name].shadow||1024,QUAL[QS.name].shadow||1024);
     Object.assign(sunL.shadow.camera,{left:-40,right:40,top:40,bottom:-40,near:1,far:260});sunL.shadow.bias=-.0006;scene.add(sunL,sunL.target);
     buildSky();buildTerrain();buildScenery();buildBase();buildFX();buildExtras();buildPlayer();buildNPCs();buildMarkers();
     addEventListener('resize',resize);resize();bindInput();
@@ -729,7 +748,7 @@ const world=(()=>{
     const ag=new THREE.CylinderGeometry(560,560,70,64,1,true);fx.aurora=new THREE.Mesh(ag,new THREE.MeshBasicMaterial({color:0x7dffb0,transparent:true,opacity:0,side:THREE.BackSide,fog:false,depthWrite:false}));fx.aurora.position.y=150;sky.add(fx.aurora);
   }
   function buildTerrain(){
-    const g=new THREE.PlaneGeometry(320,320,180,180);g.rotateX(-Math.PI/2);const p=g.attributes.position;const col=new Float32Array(p.count*3);
+    const g=new THREE.PlaneGeometry(320,320,140,140);g.rotateX(-Math.PI/2);const p=g.attributes.position;const col=new Float32Array(p.count*3);
     for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),y=H(x,z);p.setY(i,y);const n=fbm(x*.08,z*.08),m=fbm(x*.012+50,z*.012);
       let c=[lerp(.52,.72,n)*lerp(.82,1.05,m),lerp(.25,.37,n)*lerp(.86,1,m),lerp(.14,.21,n)];
       const dc=Math.hypot(x-CX,z-CZ)/CR;if(dc<1.05){const f=clamp((1.05-dc)*2.2,0,1)*smooth(.35,.7,vn(x*.25,z*.25));c=[lerp(c[0],.9,f),lerp(c[1],.88,f),lerp(c[2],.9,f)]}
@@ -945,10 +964,21 @@ const world=(()=>{
   }
   let camZ=1,occl=0;
   function resize(){R.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}
+  function applyQuality(name){QS.name=name;const q=QUAL[name];R.setPixelRatio(Math.min(devicePixelRatio,q.pr));const sh=q.shadow>0;
+    if(R.shadowMap.enabled!==sh||sunL.shadow.mapSize.x!==(q.shadow||sunL.shadow.mapSize.x)){R.shadowMap.enabled=sh;sunL.castShadow=sh;if(sh){sunL.shadow.mapSize.set(q.shadow,q.shadow);if(sunL.shadow.map){sunL.shadow.map.dispose();sunL.shadow.map=null}}
+      R.shadowMap.type=q.soft?THREE.PCFSoftShadowMap:THREE.PCFShadowMap;scene.traverse(o=>{if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>m.needsUpdate=true)})}
+    fx.devils.forEach(d=>d.p.geometry.setDrawRange(0,Math.floor(d.n*q.parts)));fx.motes.geometry.setDrawRange(0,Math.floor(fx.motes.geometry.attributes.position.count*q.parts));resize()}
+  function setQuality(pref){QS.pref=pref;try{localStorage.setItem('rf-gfx',pref)}catch(e){}applyQuality(pref==='auto'?(COARSE?'medium':'high'):pref);QS.fps=[];}
   /* ---- per-frame ---- */
   let last=performance.now(),camPos=new THREE.Vector3(30,30,40),orbit=0;
   function collide(x,z){for(const c of colliders){const dx=x-c.x,dz=z-c.z,d=Math.hypot(dx,dz),m=c.r+.45;if(d<m&&d>1e-4){x=c.x+dx/d*m;z=c.z+dz/d*m}}const r=Math.hypot(x,z);if(r>88){x*=88/r;z*=88/r}return [x,z]}
+  let skip=0;const NC=new THREE.Color(),NC0=new THREE.Color(0x2c2c48),NC1=new THREE.Color(0xffffff);
   function loop(now){
+    const covered=G&&G.phase!=='title'&&(!modal.hidden||!$('#mapov').hidden);
+    if(covered&&(++skip%3)){requestAnimationFrame(loop);return}
+    if(!covered&&G&&G.phase==='play'&&QS.pref==='auto'&&!document.hidden){QS.fr++;if(now-QS.t0>2500){const fps=QS.fr*1000/(now-QS.t0);QS.fr=0;QS.t0=now;QS.last=fps;
+        if(fps<40&&QS.name!=='low'){QS.low=(QS.low||0)+1;if(QS.low>=2){QS.low=0;applyQuality(QS.name==='high'?'medium':'low');toast(`Graphics set to <b>${QS.name}</b> so the game runs smoothly. Change it any time with the Graphics button.`,4200);renderGfx()}}else QS.low=0}}
+    else{QS.fr=0;QS.t0=now}
     const dt=Math.min(.05,(now-last)/1000);last=now;const t=now/1000;
     const playing=G&&G.phase==='play'&&!G.paused;
     // movement
@@ -981,9 +1011,9 @@ const world=(()=>{
     const fp=fx.flag.geometry.attributes.position;for(let i=0;i<fp.count;i++){const x=fp.getX(i);fp.setZ(i,Math.sin(t*4+x*3)*.12*(x+.7))}fp.needsUpdate=true;
     fx.beacon.material.color.setHex((t*1.5|0)%2?0xff3020:0x400a05);fx.rovLight.material.color.setHex((t*2|0)%2?0x40ff80:0x0a3018);fx.mast.rotation.y=Math.sin(t*.5)*1.5;
     const da=t*.25;fx.drone.position.set(Math.cos(da)*15,H(Math.cos(da)*15,Math.sin(da)*15)+6.5+Math.sin(t*1.7)*.4,Math.sin(da)*15);fx.drone.rotation.y=-da;fx.r1.rotation.y+=dt*40;fx.r2.rotation.y-=dt*40;
-    fx.devils.forEach(d=>{d.a+=dt*d.sp;const cx=Math.cos(d.a)*d.r,cz=Math.sin(d.a*1.3)*d.r*.8;const a=d.p.geometry.attributes.position;
-      for(let i=0;i<d.n;i++){const h=((i/d.n)*16+t*2.4)%16;const ang=i*.47+t*4;const rr=.5+h*.22;a.setXYZ(i,cx+Math.cos(ang)*rr,H(cx,cz)+h,cz+Math.sin(ang)*rr)}a.needsUpdate=true});
-    {const a=fx.motes.geometry.attributes.position;for(let i=0;i<a.count;i++){let x=a.getX(i)+dt*1.2,y=a.getY(i)+Math.sin(t+i)*dt*.2;if(x>30)x-=60;a.setX(i,x);a.setY(i,y)}a.needsUpdate=true;fx.motes.position.set(P.x,P.y,P.z)}
+    fx.devils.forEach(d=>{d.a+=dt*d.sp;const cx=Math.cos(d.a)*d.r,cz=Math.sin(d.a*1.3)*d.r*.8;const a=d.p.geometry.attributes.position;const gh=H(cx,cz),nn=Math.floor(d.n*QUAL[QS.name].parts);
+      for(let i=0;i<nn;i++){const h=((i/d.n)*16+t*2.4)%16;const ang=i*.47+t*4;const rr=.5+h*.22;a.setXYZ(i,cx+Math.cos(ang)*rr,gh+h,cz+Math.sin(ang)*rr)}a.needsUpdate=true});
+    {const a=fx.motes.geometry.attributes.position;const mn=Math.floor(a.count*QUAL[QS.name].parts);for(let i=0;i<mn;i++){let x=a.getX(i)+dt*1.2,y=a.getY(i)+Math.sin(t+i)*dt*.2;if(x>30)x-=60;a.setX(i,x);a.setY(i,y)}a.needsUpdate=true;fx.motes.position.set(P.x,P.y,P.z)}
     // state-driven visuals
     if(G){const lit=!!(G.done.p1&&G.done.p2&&G.done.p3)||G.level>0;fx.win.material.emissiveIntensity=lit?1.2:0;fx.batLight.material.color.setHex(lit?0x40ff9a:((t*2|0)%2?0xff4030:0x401008));fx.batLight.material.emissive.setHex(lit?0x20ff80:0xff2010);
       panels.forEach((p,i)=>{p.dust.visible=!G.done['p'+(i+1)]});
@@ -995,7 +1025,7 @@ const world=(()=>{
       fx.aurora.material.opacity=G.level===4&&G.phase==='play'?.08+Math.sin(t*.7)*.04:0;fx.aurora.rotation.y+=dt*.02;
       fx.door.material.emissive.setHex(G.level===4&&(t*2|0)%2?0xff5010:0x401000)}
     if(G&&G.phase!=='title'){const f=G.solT/SOL_LEN;const el=f<.74?Math.sin(Math.PI*f/.74):-.25*Math.sin(Math.PI*(f-.74)/.26);const day=clamp(el*2.4+.15,0,1);
-      sunL.intensity=.12+.85*day;hemi.intensity=.24+.36*day;const nc=new THREE.Color(0x2c2c48).lerp(new THREE.Color(0xffffff),day);sky.material.color.copy(nc);scene.fog.color.setRGB(.84*nc.r,.65*nc.g,.46*nc.b+(1-day)*.05);
+      sunL.intensity=.12+.85*day;hemi.intensity=.24+.36*day;const nc=NC.copy(NC0).lerp(NC1,day);sky.material.color.copy(nc);scene.fog.color.setRGB(.84*nc.r,.65*nc.g,.46*nc.b+(1-day)*.05);
       fx.stars.material.opacity=(1-day)*.9;fx.lamp.intensity=(1-day)*1.6;fx.lamp.position.set(P.x,P.y+2.2,P.z);G.dayLight=day}
     else{sky.material.color.setRGB(1,1,1);fx.stars.material.opacity=0;fx.lamp.intensity=0;sunL.intensity=.95;hemi.intensity=.55}
     if(Math.random()<.5)emit(fx.smoke,fx.smokeAt.x+(Math.random()-.5),fx.smokeAt.y,fx.smokeAt.z+(Math.random()-.5),.4+Math.random()*.4,1.2+Math.random()*.8,(Math.random()-.5)*.4,3.5);stepPool(fx.smoke,dt);
@@ -1036,7 +1066,7 @@ const world=(()=>{
   function sparkle(x,z,n=26){const y=H(x,z)+1.2;for(let i=0;i<n;i++)emit(fx.sparks,x,y,z,(Math.random()-.5)*5,2+Math.random()*3,(Math.random()-.5)*5,1.2)}
   function startStormLevel(){G.bags=0;G.crewIn=0;G.carrying=false;npcs.forEach(n=>{n.state='wander';n.x=n.home[0];n.z=n.home[1];n.tx=n.x;n.tz=n.z})}
   function resetPlayer(x=27,z=13){P.x=x;P.z=z;P.y=H(x,z);P.vy=0;P.ground=true;P.face=Math.PI/2;camPos.set(x,30,z+30)}
-  return {init,H,player:()=>P,keys,camYaw:()=>camYaw,joy:JOY,setTool,sparkle,npcs:()=>npcs,startStormLevel,resetPlayer,get ok(){return !!R}};
+  return {init,applyQuality,setQuality,H,player:()=>P,keys,camYaw:()=>camYaw,joy:JOY,setTool,sparkle,npcs:()=>npcs,startStormLevel,resetPlayer,get ok(){return !!R}};
 })();
 
 /* =====================================================================
@@ -1549,7 +1579,7 @@ function title(){
     <p class="tag">Astro’s rocket was hit by a rogue asteroid and crashed on Mars, with supplies for just 30 sols. Fix real Martian problems, upgrade your tools, find the lost manual pages and reach the satellite to call Earth for help.</p>
     <div class="lvlstrip">${LEVELS.map((L,i)=>`<div class="lvlcard ${sv&&sv.level>i?'done':''}"><span class="n">LEVEL ${i+1}</span><b style="color:${L.color}">${L.name}</b><span>Tool: ${TOOLS[L.tool]}</span></div>`).join('')}</div>
     <div class="row"><button class="cta" data-act="newgame" data-focus>${sv&&sv.level>0?'New mission':'Start mission'}</button>${sv&&sv.level>0&&sv.level<LEVELS.length?`<button class="ghost" data-act="continue">Continue from Level ${sv.level+1}</button>`:''}
-      <button class="ghost" data-act="story">Watch the story</button><button class="ghost" data-act="dataroom">NASA data room</button><button class="ghost" data-act="about">About this project</button><a class="ghost" href="manager.html" style="text-decoration:none">Strategy mode</a></div>
+      ${STANDALONE?'':(ONPAGES?'<button class="ghost" data-act="install">Install the app</button>':'<a class="ghost" href="https://benedict-nimo.github.io/red-frontier/" target="_blank" rel="noopener" style="text-decoration:none">Get the app</a>')}<button class="ghost" data-act="story">Watch the story</button><button class="ghost" data-act="dataroom">NASA data room</button><button class="ghost" data-act="about">About this project</button><a class="ghost" href="manager.html" style="text-decoration:none">Strategy mode</a></div>
     <div class="keys panel" style="padding:10px 14px"><span>Drag the round <b>joystick</b> to walk any direction</span><span>Drag the ground to look around</span><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows also move</span><span><kbd>E</kbd> use</span><span><kbd>Space</kbd> low-gravity hop</span><span><kbd>M</kbd> map</span><span>On a phone or tablet, use the on-screen buttons.</span></div>
   </div>`,'clear')}
 function help(){G.paused=true;show(`<div class="card narrow"><h2 style="font-size:24px">How to play</h2>
@@ -1558,7 +1588,8 @@ function help(){G.paused=true;show(`<div class="card narrow"><h2 style="font-siz
   <div class="check"><span class="ic good">3</span><span>Solve the puzzle. Finish every task on a level to earn a <b>new tool</b> and unlock the next level.</span></div>
   <div class="check"><span class="ic good">4</span><span><b>Watch your supplies</b> (top of the screen). Each sol uses one, and every sol shows real NASA Phoenix weather. Walk over glowing <b>manual pages</b> to collect hints for the quizzes.</span></div>
   <div class="check"><span class="ic good">5</span><span>Lost? Tap <b>MAP</b> (top right) or press <b>M</b>. It shows every task left to do. Tap "Guide me" and a blue arrow at your feet will point the way.</span></div></div>
-  <button class="cta" data-act="closehelp" data-focus>Back to the base</button></div>`)}
+  <div class="row"><span class="lbl">Game running slowly?</span><button class="sbtn" data-act="gfx">Graphics</button><span class="note">Tap to switch Auto, High, Medium or Low. Low is fastest.</span></div>
+  <button class="cta" data-act="closehelp" data-focus>Back to the base</button></div>`);renderGfx()}
 
 /* ---- About (judges) ---- */
 function about(){const st=sepStats(30);
@@ -1619,6 +1650,13 @@ const ACT={
   wt(a){const [k,v]=a.split(':');DR.wt[k]=v;modal.querySelectorAll('[data-act=wt]').forEach(b=>{const [kk,vv]=b.dataset.arg.split(':');b.classList.toggle('primary',DR.wt[kk]===vv)});DR.wtUpd&&DR.wtUpd()},
   sound(){SFX.set(!SFX.on);const b=$('#soundbtn');b.textContent=SFX.on?'Sound on':'Sound off';b.setAttribute('aria-pressed',SFX.on)},
   speak(){speak(SPEAK_TEXT)},
+  gfx(){const order=['auto','high','medium','low'];const nx=order[(order.indexOf(QS.pref)+1)%4];world.setQuality(nx);renderGfx();toast(`Graphics: <b>${nx==='auto'?'Auto':nx}</b>${nx==='low'?' (fastest)':nx==='high'?' (best looking)':''}`,2000)},
+  install(){if(INSTALL.prompt){INSTALL.prompt.prompt();INSTALL.prompt.userChoice.finally(()=>{INSTALL.prompt=null;title()})}else show(`<div class="card narrow"><div class="eyebrow">Install Red Frontier</div><h2 style="font-size:24px">Add the game to your home screen</h2>
+    <div class="sec"><div class="check"><span class="ic good">1</span><span><b>iPhone or iPad (Safari):</b> tap the Share button, then <b>Add to Home Screen</b>.</span></div>
+    <div class="check"><span class="ic good">2</span><span><b>Android (Chrome):</b> tap the ⋮ menu, then <b>Install app</b> or <b>Add to Home screen</b>.</span></div>
+    <div class="check"><span class="ic good">3</span><span><b>Computer (Chrome or Edge):</b> click the install icon at the right of the address bar.</span></div></div>
+    <p class="note">The app opens full-screen and works offline after the first visit.</p><button class="cta" data-act="closeinstall" data-focus>OK</button></div>`)},
+  closeinstall(){if(G&&G.phase==='play'){hide();G.paused=false}else title()},
 };
 document.addEventListener('click',e=>{SFX.wake();const b=e.target.closest('[data-act]');if(!b||b.disabled)return;if(b.tagName==='INPUT'&&b.dataset.act!=='guide')return;const f=ACT[b.dataset.act];if(f)f(b.dataset.arg,b)});
 document.addEventListener('input',e=>{const d=e.target.dataset||{};
@@ -1634,11 +1672,19 @@ SFX.hop=()=>{};SFX.brush=()=>{};SFX.drill=()=>{};SFX.pop=()=>{};SFX.hiss=()=>{};
   const tone=(f,d,v,type='sine',slide=0)=>{const a=ctx();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t=a.currentTime;o.type=type;o.frequency.setValueAtTime(f,t);if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f+slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+d+.05)};
   SFX.hop=()=>tone(300,.35,.04,'sine',300);SFX.brush=()=>noise(.15,.05,2500);SFX.drill=()=>tone(90,.25,.03,'sawtooth',30);SFX.pop=()=>tone(520,.1,.05,'triangle',300);SFX.hiss=v=>noise(.5,.05*v,6000,'highpass')})();
 
+const STANDALONE=matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches||navigator.standalone===true;
+const INSTALL={prompt:null};
+const ONPAGES=/\.github\.io$/.test(location.hostname)||location.hostname==='localhost';
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();INSTALL.prompt=e});
+if('serviceWorker' in navigator&&location.protocol==='https:'&&/\.github\.io$/.test(location.hostname)){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}))}
 function start(){
   modal.hidden=true;
   const ok=typeof THREE!=='undefined'&&world.init();
   if(!ok)document.body.insertAdjacentHTML('afterbegin','<p style="position:fixed;top:8px;left:16px;z-index:30;color:#f5c24f;font-size:12px">The 3D view needs WebGL, which this device or browser has turned off.</p>');
-  title();refreshNasa();
+  title();refreshNasa();renderGfx();
 }
 start();
 </script>
+
+</body>
+</html>
