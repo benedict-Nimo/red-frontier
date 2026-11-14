@@ -1183,7 +1183,7 @@ function levelUp(){if(!G.pendingLevelUp)return;G.pendingLevelUp=false;G.paused=t
   const qs=QL[G.level]||[];
   show(`<div class="card" role="dialog">
     <div class="eyebrow" style="color:var(--good)">Level ${G.level+1} complete · ${fmt(G.lvTimes[G.level])} seconds · Sol ${G.sol}</div>
-    <h2 style="font-size:30px">${last?'Earth heard you!':L.name+': done!'}</h2>
+    <h2 style="font-size:30px">${last?'Earth heard you!':L.name.replace(/!$/,'')+': done!'}</h2>
     <div class="toolbig">${tIcon(L.reward)}<div><span class="lbl" style="color:var(--rust)">${last?'You earned':'New tool unlocked'}</span><div style="font-family:var(--f-display);font-weight:700;font-size:22px">${TOOLS[L.reward]}</div>
       <div class="note" style="color:var(--fg)">${last?'A rescue ship is launching from Earth right now.':`You need it for Level ${G.level+2}: ${LEVELS[G.level+1].name}.`}${refill?` <b style="color:var(--good)">+${refill} sols of supplies</b> from what you made.`:''}</div></div></div>
     <div class="didyou"><b>What engineers learn here:</b> ${L.lesson}</div>
