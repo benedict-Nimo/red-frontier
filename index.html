@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Red Frontier: a free Mars survival game for kids. Help Astro survive a crash on Mars by solving real Martian problems. NASA Space Apps 2026.">
+<meta name="description" content="Side Quest: a free Mars survival game for kids. Help Astro survive a crash on Mars by solving real Martian problems. NASA Space Apps 2026.">
 <meta name="theme-color" content="#140D0B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Red Frontier">
+<meta name="apple-mobile-web-app-title" content="Side Quest">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<title>Red Frontier</title>
+<title>Side Quest</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>@font-face{font-family:'Chakra Petch';font-weight:500;font-display:swap;src:url(fonts/chakra-petch-latin-500-normal.woff2) format('woff2')}@font-face{font-family:'Chakra Petch';font-weight:600;font-display:swap;src:url(fonts/chakra-petch-latin-600-normal.woff2) format('woff2')}@font-face{font-family:'Chakra Petch';font-weight:700;font-display:swap;src:url(fonts/chakra-petch-latin-700-normal.woff2) format('woff2')}@font-face{font-family:'Atkinson Hyperlegible';font-weight:400;font-display:swap;src:url(fonts/atkinson-hyperlegible-latin-400-normal.woff2) format('woff2')}@font-face{font-family:'Atkinson Hyperlegible';font-weight:700;font-display:swap;src:url(fonts/atkinson-hyperlegible-latin-700-normal.woff2) format('woff2')}@font-face{font-family:'JetBrains Mono';font-weight:400;font-display:swap;src:url(fonts/jetbrains-mono-latin-400-normal.woff2) format('woff2')}@font-face{font-family:'JetBrains Mono';font-weight:600;font-display:swap;src:url(fonts/jetbrains-mono-latin-600-normal.woff2) format('woff2')}html,body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}[hidden]{display:none!important}</style>
 </head>
@@ -301,7 +301,7 @@ body.flash-white::after{background:rgba(220,240,255,.55);opacity:1;transition:no
 <script>
 'use strict';
 /* =====================================================================
-   RED FRONTIER — Junior Astronaut Mission Trainer (adventure mode)
+   SIDE QUEST — Junior Astronaut Mission Trainer (adventure mode)
    Walk the base, solve Martian problems, earn tools, unlock levels.
    ===================================================================== */
 const $=s=>document.querySelector(s);
@@ -538,7 +538,7 @@ function windTunnel(){const cv=$('#wtcv');if(!cv)return;const x=cv.getContext('2
 /* ---- About this project (for judges) ---- */
 function about(){const st=sepStats(30);
   show(`<div class="card" style="max-width:980px">
-  <div class="row" style="justify-content:space-between"><div><div class="eyebrow">NASA Space Apps 2026 · Build a Junior Astronaut Mission Trainer</div><h2 style="font-size:28px">About Red Frontier</h2></div><button class="ghost" data-act="close" data-focus>Close</button></div>
+  <div class="row" style="justify-content:space-between"><div><div class="eyebrow">NASA Space Apps 2026 · Build a Junior Astronaut Mission Trainer</div><h2 style="font-size:28px">About Side Quest</h2></div><button class="ghost" data-act="close" data-focus>Close</button></div>
   <div class="grid2" style="align-items:start">
     <div class="sec"><span class="lbl">The problem</span><p>Space lessons for young learners usually either hide the engineering trade-offs or bury them in jargon. Students never <i>feel</i> why a mission succeeds or fails.</p>
       <span class="lbl">Our solution</span><p>A game where players run a Mars outpost and every choice costs something: mass, money, power, water, crew time or radiation dose. Decisions play out sol by sol in 3D, and the debrief explains what the player’s own choices did.</p></div>
@@ -1217,7 +1217,7 @@ function sendSOS(){G.paused=true;SFX.whoosh();const mins=(5+Math.random()*15).to
 function finale(){MUSIC.setMood('win');G.phase='end';G.paused=true;$('#hud').hidden=true;const total=(performance.now()-G.t0)/1000;save();
   let name='';try{name=localStorage.getItem('rf-name')||''}catch(e){}
   show(`<div class="card" style="max-width:820px"><div class="cert">
-    <div class="eyebrow">Red Frontier · Mars base training</div>
+    <div class="eyebrow">Side Quest · Mars base training</div>
     <h2>Junior Astronaut Certificate</h2>
     <label class="note" for="certname">Type your name</label><input id="certname" maxlength="40" placeholder="Your name" value="${esc(name)}">
     <p style="margin:0 auto">survived ${G.sol} sols on Mars after Astro’s crash, fixed power, water, air and food, beat a solar storm and called Earth for a rescue.</p>
@@ -1575,7 +1575,7 @@ function title(){MUSIC.setMood('calm');
   G=newGame();S.phase='title';$('#hud').hidden=true;$('#mapov').hidden=true;const sv=loadSave();
   show(`<div class="card hero">
     <div class="eyebrow">Junior Astronaut Mission Trainer · NASA Space Apps 2026</div>
-    <h1>RED<br><span>FRONTIER</span></h1>
+    <h1>SIDE<br><span>QUEST</span></h1>
     <p class="tag">Astro’s rocket was hit by a rogue asteroid and crashed on Mars, with supplies for just 30 sols. Fix real Martian problems, upgrade your tools, find the lost manual pages and reach the satellite to call Earth for help.</p>
     <div class="lvlstrip">${LEVELS.map((L,i)=>`<div class="lvlcard ${sv&&sv.level>i?'done':''}"><span class="n">LEVEL ${i+1}</span><b style="color:${L.color}">${L.name}</b><span>Tool: ${TOOLS[L.tool]}</span></div>`).join('')}</div>
     <div class="row"><button class="cta" data-act="newgame" data-focus>${sv&&sv.level>0?'New mission':'Start mission'}</button>${sv&&sv.level>0&&sv.level<LEVELS.length?`<button class="ghost" data-act="continue">Continue from Level ${sv.level+1}</button>`:''}
@@ -1595,7 +1595,7 @@ function help(){G.paused=true;show(`<div class="card narrow"><h2 style="font-siz
 /* ---- About (judges) ---- */
 function about(){const st=sepStats(30);
   show(`<div class="card" style="max-width:980px">
-  <div class="row" style="justify-content:space-between"><div><div class="eyebrow">NASA Space Apps 2026 · Build a Junior Astronaut Mission Trainer</div><h2 style="font-size:28px">About Red Frontier</h2></div><button class="ghost" data-act="closeabout" data-focus>Close</button></div>
+  <div class="row" style="justify-content:space-between"><div><div class="eyebrow">NASA Space Apps 2026 · Build a Junior Astronaut Mission Trainer</div><h2 style="font-size:28px">About Side Quest</h2></div><button class="ghost" data-act="closeabout" data-focus>Close</button></div>
   <div class="grid2" style="align-items:start">
     <div class="sec"><span class="lbl">The problem</span><p>Space lessons for young learners usually either hide the engineering trade-offs or bury them in jargon. Children rarely get to <i>feel</i> why a mission succeeds or fails.</p>
       <span class="lbl">Our solution</span><p>A story-driven explore-and-solve game. Astro’s rocket is hit by an asteroid and crashes on Mars with 30 sols of supplies. Children guide Astro through six levels of real Martian problems: dusty solar panels and weak wooden tools, buried ice, unbreathable air, toxic soil, a solar storm, and finally aiming a satellite dish to call Earth. Each level teaches an engineering trade-off and unlocks a new tool; lost manual pages give quiz hints.</p></div>
@@ -1653,7 +1653,7 @@ const ACT={
   speak(){speak(SPEAK_TEXT)},
   music(){MUSIC.toggle();renderMusic();toast(MUSIC.on?'Music on':'Music off',1500)},
   gfx(){const order=['auto','high','medium','low'];const nx=order[(order.indexOf(QS.pref)+1)%4];world.setQuality(nx);renderGfx();toast(`Graphics: <b>${nx==='auto'?'Auto':nx}</b>${nx==='low'?' (fastest)':nx==='high'?' (best looking)':''}`,2000)},
-  install(){if(INSTALL.prompt){INSTALL.prompt.prompt();INSTALL.prompt.userChoice.finally(()=>{INSTALL.prompt=null;title()})}else show(`<div class="card narrow"><div class="eyebrow">Install Red Frontier</div><h2 style="font-size:24px">Add the game to your home screen</h2>
+  install(){if(INSTALL.prompt){INSTALL.prompt.prompt();INSTALL.prompt.userChoice.finally(()=>{INSTALL.prompt=null;title()})}else show(`<div class="card narrow"><div class="eyebrow">Install Side Quest</div><h2 style="font-size:24px">Add the game to your home screen</h2>
     <div class="sec"><div class="check"><span class="ic good">1</span><span><b>iPhone or iPad (Safari):</b> tap the Share button, then <b>Add to Home Screen</b>.</span></div>
     <div class="check"><span class="ic good">2</span><span><b>Android (Chrome):</b> tap the ⋮ menu, then <b>Install app</b> or <b>Add to Home screen</b>.</span></div>
     <div class="check"><span class="ic good">3</span><span><b>Computer (Chrome or Edge):</b> click the install icon at the right of the address bar.</span></div></div>

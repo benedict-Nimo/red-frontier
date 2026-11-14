@@ -1,4 +1,4 @@
-# Red Frontier: Junior Astronaut Mission Trainer
+# Side Quest: Junior Astronaut Mission Trainer
 
 NASA Space Apps 2026 challenge: *Build a Junior Astronaut Mission Trainer.*
 

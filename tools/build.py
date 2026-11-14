@@ -1,4 +1,4 @@
-"""Builds the GitHub Pages / installable-app version of Red Frontier from the source page.
+"""Builds the GitHub Pages / installable-app version of Side Quest from the source page.
 
 Usage: python3 tools/build.py /path/to/source/index.html
 Writes index.html, manifest.webmanifest and sw.js next to this repo's root.
@@ -13,12 +13,12 @@ head = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Red Frontier: a free Mars survival game for kids. Help Astro survive a crash on Mars by solving real Martian problems. NASA Space Apps 2026.">
+<meta name="description" content="Side Quest: a free Mars survival game for kids. Help Astro survive a crash on Mars by solving real Martian problems. NASA Space Apps 2026.">
 <meta name="theme-color" content="#140D0B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Red Frontier">
+<meta name="apple-mobile-web-app-title" content="Side Quest">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -41,8 +41,8 @@ head = head.replace('<style>html,body', pre + '<style>' + FONTCSS + 'html,body',
 open(os.path.join(ROOT, 'index.html'), 'w', encoding='utf-8').write(head + body + "\n</body>\n</html>\n")
 
 manifest = {
-    "name": "Red Frontier: Junior Astronaut Mission Trainer",
-    "short_name": "Red Frontier",
+    "name": "Side Quest: Junior Astronaut Mission Trainer",
+    "short_name": "Side Quest",
     "description": "Help Astro survive a crash on Mars by solving real Martian problems, with real NASA data.",
     "id": "./",
     "start_url": "./",
@@ -69,7 +69,7 @@ h = hashlib.sha256()
 for f in shell[1:]:
     h.update(open(os.path.join(ROOT, f), 'rb').read())
 version = 'rf-' + h.hexdigest()[:10]
-sw = f"""// Red Frontier offline support: keeps the game, its data and its libraries on the device.
+sw = f"""// Side Quest offline support: keeps the game, its data and its libraries on the device.
 const CACHE = '{version}';
 const SHELL = {json.dumps(shell)};
 self.addEventListener('install', e => {{
@@ -83,7 +83,15 @@ self.addEventListener('fetch', e => {{
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.hostname === 'api.nasa.gov') return; // live NASA data always comes from the network
-  // Serve from the device first, refresh in the background (works offline after the first visit).
+  // Pages: always try the network first so everyone gets the newest version; fall back to the saved copy offline.
+  if (req.mode === 'navigate') {{
+    e.respondWith(fetch(req).then(res => {{
+      if (res && res.ok) caches.open(CACHE).then(c => c.put(req, res.clone()));
+      return res;
+    }}).catch(() => caches.match(req, {{ignoreSearch: true}}).then(hit => hit || caches.match('index.html'))));
+    return;
+  }}
+  // Other files: serve from the device first, refresh in the background (works offline after the first visit).
   e.respondWith(caches.open(CACHE).then(cache => cache.match(req, {{ignoreSearch: true}}).then(hit => {{
     const net = fetch(req).then(res => {{
       if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
@@ -94,4 +102,9 @@ self.addEventListener('fetch', e => {{
 }});
 """
 open(os.path.join(ROOT, 'sw.js'), 'w').write(sw)
+open(os.path.join(ROOT, '404.html'), 'w').write('''<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Side Quest</title>
+<meta http-equiv="refresh" content="0; url=https://benedict-nimo.github.io/red-frontier/">
+<script>location.replace('https://benedict-nimo.github.io/red-frontier/')</script></head>
+<body style="background:#140D0B;color:#f5e9df;font-family:sans-serif;padding:24px">Taking you to <a style="color:#ff7d45" href="https://benedict-nimo.github.io/red-frontier/">Side Quest</a>...</body></html>
+''')
 print('built', version, len(shell), 'files cached')

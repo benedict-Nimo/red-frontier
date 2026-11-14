@@ -265,7 +265,7 @@ body.flash-white::after{background:rgba(220,240,255,.55);opacity:1;transition:no
 
 <div id="hud" hidden>
   <div id="topbar" class="panel">
-    <span class="brand">RED FRONTIER</span>
+    <span class="brand">SIDE QUEST</span>
     <div id="solbox"><span class="lbl">Sol</span><span class="big mono" id="solnum">1</span><span class="mono" style="color:var(--muted)" id="solof">/ 30</span></div>
     <span id="weather" class="chip good"><span class="dot"></span>Clear sky</span>
     <span id="sunchip" class="chip"><span class="mono">Sun 100%</span></span>
@@ -294,7 +294,7 @@ body.flash-white::after{background:rgba(220,240,255,.55);opacity:1;transition:no
 <script>
 'use strict';
 /* =====================================================================
-   RED FRONTIER — Junior Astronaut Mission Trainer
+   SIDE QUEST — Junior Astronaut Mission Trainer
    Turn-based Mars outpost sim (3D, three.js) + 2D pixel rover expedition.
    ===================================================================== */
 const $=s=>document.querySelector(s);
@@ -918,7 +918,7 @@ function title(){
   $('#hud').hidden=true;
   show(`<div class="card title-hero">
     <div class="eyebrow">Junior Astronaut Mission Trainer · Mars, northern plains</div>
-    <h1>RED<br><span>FRONTIER</span></h1>
+    <h1>SIDE<br><span>QUEST</span></h1>
     <p class="tag">Four astronauts. One outpost. Every choice costs something: mass, money, power, water, or radiation dose. Balance them and the mission survives.</p>
     <div class="steps"><span><b>1</b>Pack the rocket</span><span><b>2</b>Build the base</span><span><b>3</b>Survive sol by sol</span><span><b>4</b>Read the debrief</span></div>
     <div class="grid2">
@@ -1603,7 +1603,7 @@ function windTunnel(){const cv=$('#wtcv');if(!cv)return;const x=cv.getContext('2
 /* ---- About this project (for judges) ---- */
 function about(){const st=sepStats(30);
   show(`<div class="card" style="max-width:980px">
-  <div class="row" style="justify-content:space-between"><div><div class="eyebrow">NASA Space Apps 2026 · Build a Junior Astronaut Mission Trainer</div><h2 style="font-size:28px">About Red Frontier</h2></div><button class="ghost" data-act="close" data-focus>Close</button></div>
+  <div class="row" style="justify-content:space-between"><div><div class="eyebrow">NASA Space Apps 2026 · Build a Junior Astronaut Mission Trainer</div><h2 style="font-size:28px">About Side Quest</h2></div><button class="ghost" data-act="close" data-focus>Close</button></div>
   <div class="grid2" style="align-items:start">
     <div class="sec"><span class="lbl">The problem</span><p>Space lessons for young learners usually either hide the engineering trade-offs or bury them in jargon. Students never <i>feel</i> why a mission succeeds or fails.</p>
       <span class="lbl">Our solution</span><p>A game where players run a Mars outpost and every choice costs something: mass, money, power, water, crew time or radiation dose. Decisions play out sol by sol in 3D, and the debrief explains what the player’s own choices did.</p></div>

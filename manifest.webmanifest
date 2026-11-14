@@ -1,6 +1,6 @@
 {
-  "name": "Red Frontier: Junior Astronaut Mission Trainer",
-  "short_name": "Red Frontier",
+  "name": "Side Quest: Junior Astronaut Mission Trainer",
+  "short_name": "Side Quest",
   "description": "Help Astro survive a crash on Mars by solving real Martian problems, with real NASA data.",
   "id": "./",
   "start_url": "./",
