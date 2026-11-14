@@ -282,7 +282,7 @@ body.flash-white::after{background:rgba(220,240,255,.55);opacity:1;transition:no
       <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7l8-3 10 3 8-3v21l-8 3-10-3-8 3z"/><path d="M11 4v21M21 7v21"/><circle cx="16" cy="14" r="2.4" fill="#ff7d45" stroke="none"/></svg>
       MAP<span class="cnt" id="mapcount">0 left</span></button>
     <button id="manbtn" data-act="manual" aria-label="Open the manual"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 6c4-2 8-2 11 1 3-3 7-3 11-1v20c-4-2-8-2-11 1-3-3-7-3-11-1z"/><path d="M16 7v20"/></svg>MANUAL<span class="cnt" id="mancount">0/12</span></button>
-    <div id="cornerSmall"><button class="cbtn" data-act="dataroom">NASA data</button><button class="cbtn" data-act="gfx">Graphics: Auto</button><button class="cbtn" id="soundbtn" data-act="sound" aria-pressed="true">Sound on</button><button class="cbtn" data-act="help">Help</button></div>
+    <div id="cornerSmall"><button class="cbtn" data-act="dataroom">NASA data</button><button class="cbtn" data-act="gfx">Graphics: Auto</button><button class="cbtn" data-act="music" aria-pressed="true">Music on</button><button class="cbtn" id="soundbtn" data-act="sound" aria-pressed="true">Sound on</button><button class="cbtn" data-act="help">Help</button></div>
   </div>
   <div id="wx" class="panel pad-t"></div>
   <div id="timer" class="panel pad-t" hidden><div class="lbl" style="color:var(--bad)">Solar storm arrives in</div><div class="t" id="timerv">3:00</div></div>
@@ -1148,7 +1148,7 @@ function renderHUD(){if(!G||G.phase==='title')return;
 function startGame(fromSave){
   G=newGame();if(fromSave){G.level=fromSave.level;G.tools=fromSave.tools;G.quizRight=fromSave.quizRight||0;G.quizTotal=fromSave.quizTotal||0;G.stone=fromSave.stone||G.stone;G.pages=fromSave.pages||[];G.sol=fromSave.sol||1;G.supplies=Math.max(8,fromSave.supplies||START_SUPPLIES);for(const t of TASKS)if(t.lv<G.level)G.done[t.id]=true}
   G.phase='play';S.phase='play';world.resetPlayer();$('#hud').hidden=false;startLevel(G.level)}
-function startLevel(i){G.level=i;G.paused=true;G.levelT0=performance.now();G.waypoint=null;const L=LEVELS[i];world.setTool(L.tool);
+function startLevel(i){MUSIC.setMood('explore');G.level=i;G.paused=true;G.levelT0=performance.now();G.waypoint=null;const L=LEVELS[i];world.setTool(L.tool);
   if(i===4){world.startStormLevel();G.storm=null;delete G.done.bags;delete G.done.crew;delete G.done.inside}
   if(i===5&&G.level===5){}
   renderHUD();
@@ -1168,7 +1168,7 @@ function startLevel(i){G.level=i;G.paused=true;G.levelT0=performance.now();G.way
     <p class="note">Drag the orange joystick to walk in any direction, and drag the ground to turn the camera. Follow the blue arrow at your feet, or open the <b>Map</b> (top right).</p>
     <button class="cta" data-act="golevel" data-focus>${i===4?'Start the countdown!':'Let’s go'}</button></div>`);
 }
-function goLevel(){hide();G.paused=false;if(G.level===4){G.storm=STORM_TIME;G.warned30=false;SFX.alarm();shake('spe');setTimeout(()=>toast('Look up! Solar storms light up auroras on Mars. NASA\u2019s Perseverance rover photographed a green one in 2024.',5000),2500)}renderHUD()}
+function goLevel(){hide();G.paused=false;if(G.level===4){MUSIC.setMood('storm');G.storm=STORM_TIME;G.warned30=false;SFX.alarm();shake('spe');setTimeout(()=>toast('Look up! Solar storms light up auroras on Mars. NASA\u2019s Perseverance rover photographed a green one in 2024.',5000),2500)}renderHUD()}
 function realSep(){const e=pick(NASA.sepEvents);if(!e)return '';const st=sepStats(1);return `<div class="didyou"><b>Based on real NASA data:</b> on ${e.date} satellites near Earth measured a storm of fast protons${e.over100?' above 100 MeV':''}${e.flare?`, set off by a solar flare at ${e.flare.slice(11)} UTC`:''}. Last year, storms like this came about once every ${Math.round(st.days/st.n)} days.</div>`}
 function completeTask(id){if(G.done[id])return;G.done[id]=true;const t=taskById(id);if(t&&t.at)world.sparkle(t.at[0],t.at[1]);SFX.good();
   if(G.waypoint===id)G.waypoint=null;renderHUD();
@@ -1176,7 +1176,7 @@ function completeTask(id){if(G.done[id])return;G.done[id]=true;const t=taskById(
   else if(t&&modal.hidden)toast(`<b>Done:</b> ${esc(t.name)}. ${left.length} task${left.length>1?'s':''} left on this level.`,2600)}
 function levelUp(){if(!G.pendingLevelUp)return;G.pendingLevelUp=false;G.paused=true;const L=LEVELS[G.level];
   G.lvTimes[G.level]=(performance.now()-G.levelT0)/1000;
-  if(G.level===4){G.storm=null;$('#timer').hidden=true}
+  if(G.level===4){G.storm=null;$('#timer').hidden=true;MUSIC.setMood('explore')}
   const refill=REFILL[G.level]||0;if(refill)G.supplies+=refill;
   G.tools.includes(L.reward)||G.tools.push(L.reward);G.newTool=L.reward;save();renderHUD();SFX.badge();confetti();
   const last=G.level===LEVELS.length-1;G.qAns={};
@@ -1214,7 +1214,7 @@ function sendSOS(){G.paused=true;SFX.whoosh();const mins=(5+Math.random()*15).to
     x.fillStyle='#bda594';x.font='600 14px JetBrains Mono, monospace';x.fillText(`T+ ${(k*mins).toFixed(1)} min`,240,30);
     if(k<1&&$('#mg'))MG.raf=requestAnimationFrame(f);else if(k>=1){SFX.badge();$('#sosmsg').innerHTML=`<b style="color:var(--good)">Message received on Earth!</b> Mission Control answers: “We hear you, Astro! A rescue ship launches immediately. Hang in there.”`;
       setTimeout(()=>{endLoops();hide();completeTask('sos')},2600)}})(t0)}
-function finale(){G.phase='end';G.paused=true;$('#hud').hidden=true;const total=(performance.now()-G.t0)/1000;save();
+function finale(){MUSIC.setMood('win');G.phase='end';G.paused=true;$('#hud').hidden=true;const total=(performance.now()-G.t0)/1000;save();
   let name='';try{name=localStorage.getItem('rf-name')||''}catch(e){}
   show(`<div class="card" style="max-width:820px"><div class="cert">
     <div class="eyebrow">Red Frontier · Mars base training</div>
@@ -1571,7 +1571,7 @@ function wxChart(){const D=PHX.days,W=640,Hh=200,pad=34;const sx=i=>pad+(D[i].so
 /* =====================================================================
    SCREENS
    ===================================================================== */
-function title(){
+function title(){MUSIC.setMood('calm');
   G=newGame();S.phase='title';$('#hud').hidden=true;$('#mapov').hidden=true;const sv=loadSave();
   show(`<div class="card hero">
     <div class="eyebrow">Junior Astronaut Mission Trainer · NASA Space Apps 2026</div>
@@ -1589,7 +1589,8 @@ function help(){G.paused=true;show(`<div class="card narrow"><h2 style="font-siz
   <div class="check"><span class="ic good">4</span><span><b>Watch your supplies</b> (top of the screen). Each sol uses one, and every sol shows real NASA Phoenix weather. Walk over glowing <b>manual pages</b> to collect hints for the quizzes.</span></div>
   <div class="check"><span class="ic good">5</span><span>Lost? Tap <b>MAP</b> (top right) or press <b>M</b>. It shows every task left to do. Tap "Guide me" and a blue arrow at your feet will point the way.</span></div></div>
   <div class="row"><span class="lbl">Game running slowly?</span><button class="sbtn" data-act="gfx">Graphics</button><span class="note">Tap to switch Auto, High, Medium or Low. Low is fastest.</span></div>
-  <button class="cta" data-act="closehelp" data-focus>Back to the base</button></div>`);renderGfx()}
+  <div class="row"><span class="lbl">Soundtrack</span><button class="sbtn" data-act="music">Music on</button><button class="sbtn" data-act="sound">Sound effects</button></div>
+  <button class="cta" data-act="closehelp" data-focus>Back to the base</button></div>`);renderGfx();renderMusic()}
 
 /* ---- About (judges) ---- */
 function about(){const st=sepStats(30);
@@ -1650,6 +1651,7 @@ const ACT={
   wt(a){const [k,v]=a.split(':');DR.wt[k]=v;modal.querySelectorAll('[data-act=wt]').forEach(b=>{const [kk,vv]=b.dataset.arg.split(':');b.classList.toggle('primary',DR.wt[kk]===vv)});DR.wtUpd&&DR.wtUpd()},
   sound(){SFX.set(!SFX.on);const b=$('#soundbtn');b.textContent=SFX.on?'Sound on':'Sound off';b.setAttribute('aria-pressed',SFX.on)},
   speak(){speak(SPEAK_TEXT)},
+  music(){MUSIC.toggle();renderMusic();toast(MUSIC.on?'Music on':'Music off',1500)},
   gfx(){const order=['auto','high','medium','low'];const nx=order[(order.indexOf(QS.pref)+1)%4];world.setQuality(nx);renderGfx();toast(`Graphics: <b>${nx==='auto'?'Auto':nx}</b>${nx==='low'?' (fastest)':nx==='high'?' (best looking)':''}`,2000)},
   install(){if(INSTALL.prompt){INSTALL.prompt.prompt();INSTALL.prompt.userChoice.finally(()=>{INSTALL.prompt=null;title()})}else show(`<div class="card narrow"><div class="eyebrow">Install Red Frontier</div><h2 style="font-size:24px">Add the game to your home screen</h2>
     <div class="sec"><div class="check"><span class="ic good">1</span><span><b>iPhone or iPad (Safari):</b> tap the Share button, then <b>Add to Home Screen</b>.</span></div>
@@ -1658,7 +1660,7 @@ const ACT={
     <p class="note">The app opens full-screen and works offline after the first visit.</p><button class="cta" data-act="closeinstall" data-focus>OK</button></div>`)},
   closeinstall(){if(G&&G.phase==='play'){hide();G.paused=false}else title()},
 };
-document.addEventListener('click',e=>{SFX.wake();const b=e.target.closest('[data-act]');if(!b||b.disabled)return;if(b.tagName==='INPUT'&&b.dataset.act!=='guide')return;const f=ACT[b.dataset.act];if(f)f(b.dataset.arg,b)});
+document.addEventListener('click',e=>{SFX.wake();MUSIC.ensure();const b=e.target.closest('[data-act]');if(!b||b.disabled)return;if(b.tagName==='INPUT'&&b.dataset.act!=='guide')return;const f=ACT[b.dataset.act];if(f)f(b.dataset.arg,b)});
 document.addEventListener('input',e=>{const d=e.target.dataset||{};
   if(d.grow&&MG.grow)MG.grow(d.grow,+e.target.value);
   if(d.dr==='sols'){DR.sols=+e.target.value;const st=sepStats(DR.sols);$('#solsv').textContent=DR.sols+' sols';$('#pv').textContent=Math.round(st.p*100)+'%';$('#pd').textContent=`chance of at least one storm (about ${fmt(st.exp,1)} expected), if storms come at last year’s rate.`}
@@ -1666,6 +1668,58 @@ document.addEventListener('input',e=>{const d=e.target.dataset||{};
   if(d.dr==='wind'){DR.wt.wind=+e.target.value;$('#windv').textContent=DR.wt.wind+' m/s';DR.wtUpd&&DR.wtUpd()}
   if(e.target.id==='certname'){try{localStorage.setItem('rf-name',e.target.value)}catch(err){}}});
 // extra sounds for the adventure
+/* ---- Soundtrack: generated live with the Web Audio API (no audio files) ---- */
+const MUSIC=(()=>{
+  const N=m=>440*Math.pow(2,(m-69)/12);
+  // chord tones as MIDI numbers: root, fifth, octave, third, colour note
+  const MOODS={
+    calm:{bpm:64,chords:[[50,57,62,65,69],[46,53,58,62,65],[41,48,53,57,60],[48,55,60,64,67]],arp:.55,drums:0,pad:1},
+    explore:{bpm:80,chords:[[50,57,62,65,69],[46,53,58,62,65],[41,48,53,57,60],[48,55,60,62,67]],arp:1,drums:.55,pad:.85},
+    storm:{bpm:108,chords:[[50,57,62,65,69],[43,50,55,58,62],[46,53,58,62,65],[45,52,57,61,64]],arp:1,drums:1,pad:.7,pulse:1},
+    win:{bpm:88,chords:[[41,48,53,57,60],[48,55,60,64,67],[50,57,62,65,69],[46,53,58,62,65]],arp:1,drums:.6,pad:1}};
+  function bus(ctx,dest){
+    const out=ctx.createGain();out.gain.value=1;out.connect(dest);
+    const dl=ctx.createDelay(1.5);dl.delayTime.value=.42;const fb=ctx.createGain();fb.gain.value=.38;const wet=ctx.createGain();wet.gain.value=.45;
+    const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=2600;dl.connect(lp);lp.connect(fb);fb.connect(dl);lp.connect(wet);wet.connect(out);
+    const noise=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate);const d=noise.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    return {ctx,out,delay:dl,noise};
+  }
+  function voice(B,type,f,t,dur,vol,o={}){const c=B.ctx;const os=c.createOscillator();os.type=type;os.frequency.setValueAtTime(f,t);if(o.detune)os.detune.value=o.detune;
+    const g=c.createGain();const a=o.attack||.01,r=o.release||.3;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+a);g.gain.setValueAtTime(vol,t+Math.max(a,dur-r*.3));g.gain.exponentialRampToValueAtTime(.0001,t+dur+r);
+    let node=os;if(o.cut){const fl=c.createBiquadFilter();fl.type='lowpass';fl.frequency.value=o.cut;fl.Q.value=.6;os.connect(fl);node=fl}
+    node.connect(g);g.connect(B.out);if(o.echo){const s=c.createGain();s.gain.value=o.echo;g.connect(s);s.connect(B.delay)}os.start(t);os.stop(t+dur+r+.05)}
+  function kick(B,t,v){const c=B.ctx,o=c.createOscillator(),g=c.createGain();o.frequency.setValueAtTime(110,t);o.frequency.exponentialRampToValueAtTime(42,t+.18);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+.35);o.connect(g);g.connect(B.out);o.start(t);o.stop(t+.4)}
+  function hat(B,t,v){const c=B.ctx,s=c.createBufferSource();s.buffer=B.noise;const f=c.createBiquadFilter();f.type='highpass';f.frequency.value=7000;const g=c.createGain();g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+.06);s.connect(f);f.connect(g);g.connect(B.out);s.start(t,Math.random(),.1)}
+  function wind(B,t,dur,v){const c=B.ctx,s=c.createBufferSource();s.buffer=B.noise;s.loop=true;const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=380;f.Q.value=.7;
+    const g=c.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+dur*.5);g.gain.linearRampToValueAtTime(0,t+dur);s.connect(f);f.connect(g);g.connect(B.out);s.start(t);s.stop(t+dur+.1)}
+  // schedules one 4-beat bar starting at time t; returns its length in seconds
+  function bar(B,t,i,mood){const M=MOODS[mood]||MOODS.explore,beat=60/M.bpm,ch=M.chords[i%4],L=beat*4;
+    ch.slice(0,4).forEach((m,k)=>voice(B,'sawtooth',N(m),t,L,.016*M.pad,{attack:1.1,release:1.4,cut:900,detune:k%2?6:-6}));
+    voice(B,'triangle',N(ch[0]-12),t,beat*1.7,.075,{attack:.02,release:.35});voice(B,'triangle',N(ch[0]-12),t+beat*2,beat*1.7,.065,{attack:.02,release:.35});
+    const pat=[1,2,3,4,3,2,4,2];for(let k=0;k<8;k++){if(mood==='calm'&&k%2)continue;voice(B,'triangle',N(ch[pat[k]]+12),t+k*beat/2,beat*.42,.024*M.arp,{attack:.004,release:.28,echo:.5})}
+    if(M.drums){kick(B,t,.26*M.drums);kick(B,t+beat*2,.22*M.drums);for(let k=1;k<8;k+=2)hat(B,t+k*beat/2,.035*M.drums)}
+    if(M.pulse)for(let k=0;k<16;k+=2)voice(B,'square',N(ch[0]-24),t+k*beat/4,beat*.18,.028,{attack:.004,release:.08,cut:380});
+    if(i%2===0)voice(B,'sine',N(ch[4]+12),t+beat*3,beat*2.5,.028,{attack:.01,release:2.2,echo:.7});
+    if(i%4===0)wind(B,t,L*4,.02);
+    return L}
+  let ac=null,B=null,master=null,timer=0,next=0,count=0,mood='calm';
+  let on=(()=>{try{return localStorage.getItem('rf-music')!=='off'}catch(e){return true}})();
+  function ensure(){if(!on)return;if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){return}
+      master=ac.createGain();master.gain.value=.0001;const comp=ac.createDynamicsCompressor();master.connect(comp);comp.connect(ac.destination);B=bus(ac,master);next=ac.currentTime+.15}
+    if(ac.state==='suspended')ac.resume().catch(()=>{});
+    master.gain.cancelScheduledValues(ac.currentTime);master.gain.setTargetAtTime(.8,ac.currentTime,.6);
+    if(!timer)timer=setInterval(()=>{if(!ac||ac.state!=='running')return;if(next<ac.currentTime)next=ac.currentTime+.05;while(next<ac.currentTime+1.5){next+=bar(B,next,count++,mood)}},200)}
+  function stop(){if(ac&&master){master.gain.setTargetAtTime(.0001,ac.currentTime,.25)}clearInterval(timer);timer=0}
+  function toggle(){on=!on;try{localStorage.setItem('rf-music',on?'on':'off')}catch(e){}if(on)ensure();else stop();return on}
+  function setMood(m){if(m!==mood){mood=m;count=0}}
+  // renders the soundtrack to raw audio (used to make the demo video)
+  async function render(seconds,timeline){const sr=44100;const c=new OfflineAudioContext(2,Math.ceil(sr*seconds),sr);const m=c.createGain();m.gain.value=.5;const comp=c.createDynamicsCompressor();m.connect(comp);comp.connect(c.destination);const b=bus(c,m);
+    let t=.1,i=0;while(t<seconds){const md=(timeline.find(x=>t>=x[0]&&t<x[1])||[0,0,'explore'])[2];if(md!==render.last){i=0;render.last=md}t+=bar(b,t,i++,md)}
+    const buf=await c.startRendering();return [buf.getChannelData(0),buf.getChannelData(1)]}
+  return {ensure,stop,toggle,setMood,render,get on(){return on}};
+})();
+
+function renderMusic(){document.querySelectorAll('[data-act=music]').forEach(b=>{b.textContent=MUSIC.on?'Music on':'Music off';b.setAttribute('aria-pressed',MUSIC.on)})}
 SFX.hop=()=>{};SFX.brush=()=>{};SFX.drill=()=>{};SFX.pop=()=>{};SFX.hiss=()=>{};
 (()=>{let ac=null;const ctx=()=>{if(!SFX.on)return null;try{ac=ac||new (window.AudioContext||window.webkitAudioContext)()}catch(e){return null}return ac};
   const noise=(d,v,f,type='bandpass')=>{const a=ctx();if(!a)return;const b=a.createBuffer(1,Math.max(1,a.sampleRate*d|0),a.sampleRate),c=b.getChannelData(0);for(let i=0;i<c.length;i++)c[i]=(Math.random()*2-1)*(1-i/c.length);const s=a.createBufferSource();s.buffer=b;const fl=a.createBiquadFilter();fl.type=type;fl.frequency.value=f;const g=a.createGain();g.gain.value=v;s.connect(fl);fl.connect(g);g.connect(a.destination);s.start()};
@@ -1681,7 +1735,7 @@ function start(){
   modal.hidden=true;
   const ok=typeof THREE!=='undefined'&&world.init();
   if(!ok)document.body.insertAdjacentHTML('afterbegin','<p style="position:fixed;top:8px;left:16px;z-index:30;color:#f5c24f;font-size:12px">The 3D view needs WebGL, which this device or browser has turned off.</p>');
-  title();refreshNasa();renderGfx();
+  title();refreshNasa();renderGfx();renderMusic();
 }
 start();
 </script>
