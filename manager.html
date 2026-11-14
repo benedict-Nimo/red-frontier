@@ -1,0 +1,1683 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>html,body{margin:0}[hidden]{display:none!important}</style></head><body><title>Outpost Manager</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: full-bleed 3D Mars scene; mission-control panels dock left/right on desktop,
+   collapse to a tabbed bottom sheet on phones. Single committed dark look (night-shift mission control). */
+:root{
+  --ground:#140d0b;
+  --panel:rgba(31,21,18,.90);
+  --panel2:#2a1c17;
+  --line:#4b342b;
+  --fg:#f5e9df;
+  --muted:#bda594;
+  --rust:#ff7d45;
+  --sky:#e9b680;
+  --ice:#8fd8f2;
+  --good:#80d897;
+  --warn:#f5c24f;
+  --bad:#ff6253;
+  --f-display:'Chakra Petch','Segoe UI',system-ui,sans-serif;
+  --f-body:'Atkinson Hyperlegible',system-ui,-apple-system,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;overflow:hidden;background:var(--ground);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:.01em}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.lbl{font-family:var(--f-display);text-transform:uppercase;letter-spacing:.12em;font-size:11px;color:var(--muted);font-weight:600}
+#world{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0;pointer-events:none;display:grid;
+  grid-template-columns:300px 1fr 340px;grid-template-rows:auto 1fr auto;gap:12px;
+  padding-block:calc(10px + env(safe-area-inset-top,0px)) calc(10px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#hud[hidden]{display:none!important}
+#hud>*{pointer-events:auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#topbar{grid-column:1/4;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 12px}
+#topbar .brand{font-family:var(--f-display);font-weight:700;letter-spacing:.14em;font-size:13px;color:var(--rust)}
+#solbox{display:flex;align-items:baseline;gap:6px}
+#solbox .big{font-family:var(--f-display);font-size:22px;font-weight:700}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);font-size:12px;white-space:nowrap}
+.chip.good{border-color:color-mix(in srgb,var(--good) 50%,transparent);color:var(--good)}
+.chip.warn{border-color:color-mix(in srgb,var(--warn) 55%,transparent);color:var(--warn)}
+.chip.bad{border-color:color-mix(in srgb,var(--bad) 60%,transparent);color:var(--bad)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+#season{display:flex;align-items:center;gap:8px;min-width:150px;flex:1}
+#season .track{flex:1;height:6px;border-radius:3px;background:linear-gradient(90deg,#e9b680,#c98a5a 55%,#cfe4ee);position:relative;max-width:220px}
+#season .pin{position:absolute;top:-4px;width:3px;height:14px;background:var(--fg);border-radius:2px}
+.tbtn{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:5px 10px;font-size:12px}
+.tbtn[aria-pressed="true"]{border-color:var(--sky);color:var(--sky)}
+#leftp,#rightp{overflow:auto;min-height:0;padding:12px;display:flex;flex-direction:column;gap:12px}
+#leftp{grid-column:1;grid-row:2}
+#rightp{grid-column:3;grid-row:2}
+#bottom{grid-column:1/4;grid-row:3;display:flex;gap:12px;align-items:stretch}
+#logbox{flex:1;min-width:0;padding:8px 12px;display:flex;flex-direction:column;gap:2px;max-height:92px;overflow:hidden;cursor:pointer}
+#logbox .row{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px;color:var(--muted)}
+#logbox .row:first-child{color:var(--fg)}
+#logbox .sol{font-family:var(--f-mono);color:var(--rust);margin-right:6px;font-size:11px}
+#endbtn{min-width:200px;border:none;border-radius:6px;background:var(--rust);color:#1a0d07;font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:.06em;padding:10px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-shadow:0 6px 24px rgba(255,125,69,.25)}
+#endbtn small{font-family:var(--f-body);font-weight:400;font-size:11px;letter-spacing:0;opacity:.8}
+#endbtn:disabled{background:#5a4038;color:#bda594;box-shadow:none;cursor:not-allowed}
+#tabs{display:none}
+
+/* vitals */
+.vital{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:baseline}
+.vital .name{font-weight:700;font-size:13px}
+.vital .val{font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums;text-align:right}
+.vital .bar{grid-column:1/3;height:7px;border-radius:4px;background:#3a2822;overflow:hidden}
+.vital .bar i{display:block;height:100%;border-radius:4px;transition:width .6s ease}
+.vital .sub{grid-column:1/3;font-size:11.5px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.up{color:var(--good)}.down{color:var(--bad)}.flat{color:var(--muted)}
+.sec{display:flex;flex-direction:column;gap:9px}
+.sec+.sec{border-top:1px solid var(--line);padding-top:12px}
+.obj{display:flex;gap:8px;align-items:flex-start;font-size:13px}
+.obj .box{flex:none;width:16px;height:16px;border-radius:3px;border:1.5px solid var(--muted);margin-top:2px;display:grid;place-items:center;font-size:11px}
+.obj.done .box{background:var(--good);border-color:var(--good);color:#10240f}
+.obj.fail .box{background:var(--bad);border-color:var(--bad);color:#2a0b07}
+.math{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);display:flex;flex-direction:column;gap:2px;background:#1b1210;border:1px dashed var(--line);border-radius:5px;padding:8px}
+.math b{color:var(--fg);font-weight:600}
+.forecast{font-size:13px;padding:8px 10px;border-radius:5px;background:var(--panel2);border:1px solid var(--line)}
+
+/* right panel */
+.rtabs{display:flex;gap:4px;background:var(--panel2);padding:3px;border-radius:6px;border:1px solid var(--line)}
+.rtabs button{flex:1;border:none;background:none;padding:6px 4px;border-radius:4px;font-family:var(--f-display);font-weight:600;font-size:13px;color:var(--muted)}
+.rtabs button[aria-selected="true"]{background:var(--rust);color:#1a0d07}
+.crew{border:1px solid var(--line);border-radius:6px;padding:9px;display:flex;flex-direction:column;gap:7px;background:#22171480}
+.crew .hd{display:flex;align-items:center;gap:8px}
+.crew .av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:12px;color:#160c08;flex:none}
+.crew .nm{font-weight:700;font-size:13.5px;line-height:1.1}
+.crew .rl{font-size:11.5px;color:var(--muted)}
+.crew .dose{margin-left:auto;text-align:right;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.tasks{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.tasks button{border:1px solid var(--line);background:var(--panel2);border-radius:4px;font-size:11.5px;padding:5px 2px;line-height:1.1}
+.tasks button.out{border-style:dashed}
+.tasks button[aria-pressed="true"]{background:var(--sky);border-color:var(--sky);color:#1a0d07;font-weight:700}
+.note{font-size:12px;color:var(--muted)}
+.warnline{font-size:12.5px;color:var(--warn)}
+.sys{display:grid;grid-template-columns:1fr auto;gap:2px 8px;border:1px solid var(--line);border-radius:6px;padding:8px 9px;align-items:center}
+.sys.sel{border-color:var(--sky);box-shadow:0 0 0 1px var(--sky)}
+.sys .t{font-weight:700;font-size:13px}
+.sys .s{font-size:11.5px;color:var(--muted);grid-column:1/3;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sbtn{border:1px solid var(--line);background:var(--panel2);border-radius:4px;padding:4px 9px;font-size:12px}
+.sbtn.on{border-color:var(--good);color:var(--good)}
+.sbtn.primary{background:var(--sky);border-color:var(--sky);color:#1a0d07;font-weight:700}
+.sbtn:disabled{opacity:.45;cursor:not-allowed}
+.prog{height:6px;background:#3a2822;border-radius:3px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--ice)}
+.bcard{text-align:left;border:1px solid var(--line);background:var(--panel2);border-radius:6px;padding:9px 10px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.bcard[aria-pressed="true"]{border-color:var(--sky);box-shadow:0 0 0 1px var(--sky)}
+
+/* ---------- Modal ---------- */
+#modal{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:rgba(12,7,6,.62);
+  padding-block:calc(14px + env(safe-area-inset-top,0px)) calc(14px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));overflow:auto}
+#modal[hidden],#placehint[hidden]{display:none!important}
+#modal.clear{background:linear-gradient(180deg,rgba(12,7,6,.15),rgba(12,7,6,.7))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;width:100%;max-width:880px;padding:24px;display:flex;flex-direction:column;gap:16px;max-height:100%;overflow:auto;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.card.narrow{max-width:560px}
+.card p{margin:0;max-width:68ch}
+.eyebrow{font-family:var(--f-display);color:var(--rust);text-transform:uppercase;letter-spacing:.16em;font-size:12px;font-weight:600}
+.cta{border:none;border-radius:6px;background:var(--rust);color:#1a0d07;font-family:var(--f-display);font-weight:700;font-size:16px;letter-spacing:.05em;padding:11px 22px}
+.cta:disabled{background:#5a4038;color:#bda594;cursor:not-allowed}
+.ghost{border:1px solid var(--line);border-radius:6px;background:var(--panel2);padding:10px 16px;font-family:var(--f-display);font-weight:600}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+
+.title-hero{max-width:980px;background:none;border:none;backdrop-filter:none;-webkit-backdrop-filter:none;gap:22px}
+.title-hero h1{font-size:clamp(44px,9vw,96px);line-height:.9;font-weight:700;letter-spacing:.02em;color:var(--fg);text-shadow:0 4px 30px rgba(0,0,0,.5)}
+.title-hero h1 span{color:var(--rust)}
+.title-hero .tag{font-size:clamp(15px,2.2vw,19px);max-width:52ch;color:var(--fg);text-shadow:0 2px 12px rgba(0,0,0,.6)}
+.rank{text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:6px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.rank:hover{border-color:var(--rust)}
+.rank h3{font-size:22px}
+.rank .meta{font-family:var(--f-mono);font-size:12px;color:var(--sky)}
+.steps{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--fg)}
+.steps b{font-family:var(--f-mono);color:var(--rust);margin-right:4px}
+
+.fact{border:1px solid var(--line);border-radius:6px;padding:12px;background:var(--panel2);display:flex;flex-direction:column;gap:4px}
+.fact .n{font-family:var(--f-display);font-size:24px;font-weight:700;color:var(--sky);line-height:1.1}
+.fact .d{font-size:13px;color:var(--muted)}
+
+/* manifest */
+.meters{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.meter{display:flex;flex-direction:column;gap:4px}
+.meter .bar{height:10px;background:#3a2822;border-radius:5px;overflow:hidden}
+.meter .bar i{display:block;height:100%;background:var(--sky);transition:width .25s}
+.meter.over .bar i{background:var(--bad)}
+.items{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.item{border:1px solid var(--line);border-radius:6px;padding:10px;background:var(--panel2);display:flex;flex-direction:column;gap:6px}
+.item .top{display:flex;justify-content:space-between;align-items:flex-start;gap:6px}
+.item .nm{font-weight:700}
+.item .mc{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.item .st{font-size:12.5px;color:var(--sky)}
+.item .tr{font-size:12px;color:var(--muted)}
+.step{display:flex;align-items:center;gap:6px;margin-top:auto}
+.step button{width:30px;height:28px;border-radius:4px;border:1px solid var(--line);background:#1c1311;font-weight:700}
+.step button:disabled{opacity:.35;cursor:not-allowed}
+.step .c{font-family:var(--f-mono);min-width:22px;text-align:center;font-size:15px}
+.item.has{border-color:color-mix(in srgb,var(--sky) 55%,var(--line))}
+.checks{display:flex;flex-direction:column;gap:6px}
+.check{display:flex;gap:8px;font-size:13px;align-items:flex-start}
+.check .ic{flex:none;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#160c08;margin-top:1px}
+.ic.good{background:var(--good)}.ic.warn{background:var(--warn)}.ic.bad{background:var(--bad)}
+.prio{display:grid;grid-template-columns:120px 1fr 28px;gap:8px;align-items:center;font-size:13px}
+.prio input{width:100%;accent-color:var(--rust)}
+
+/* events */
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{text-align:left;border:1px solid var(--line);border-radius:6px;background:var(--panel2);padding:12px;display:flex;flex-direction:column;gap:4px}
+.opt:hover:not(:disabled){border-color:var(--rust)}
+.opt:disabled{opacity:.45;cursor:not-allowed}
+.opt .l{font-family:var(--f-display);font-weight:700;font-size:16px}
+.opt .tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line)}
+.tag.p{color:var(--good);border-color:color-mix(in srgb,var(--good) 45%,transparent)}
+.tag.m{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+.didyou{border-left:3px solid var(--ice);padding:6px 10px;background:#18202414;font-size:13px;color:var(--fg)}
+.didyou b{color:var(--ice)}
+
+/* expedition */
+#xwrap{position:relative;width:100%;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+#xcv{width:100%;display:block;image-rendering:pixelated;image-rendering:crisp-edges;aspect-ratio:320/170;max-width:100%}
+.xhud{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;align-items:center}
+.xhud .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-family:var(--f-display)}
+.xbar{width:110px;height:8px;background:#3a2822;border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle}
+.xbar i{display:block;height:100%;background:var(--good)}
+.pad-btns{display:flex;gap:8px}
+.pad-btns button{flex:1;min-height:48px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);font-family:var(--f-display);font-weight:700;font-size:16px;user-select:none;-webkit-user-select:none;touch-action:none}
+.pad-btns button.active{background:var(--sky);color:#1a0d07}
+#xtoast{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(20,13,11,.9);border:1px solid var(--ice);border-radius:5px;padding:6px 10px;font-size:12.5px;opacity:0;transition:opacity .3s;pointer-events:none}
+#xtoast.show{opacity:1}
+
+/* debrief */
+.grade{font-family:var(--f-display);font-size:64px;font-weight:700;line-height:1;color:var(--rust)}
+.scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.score{border:1px solid var(--line);border-radius:6px;padding:10px;background:var(--panel2)}
+.score .v{font-family:var(--f-mono);font-size:22px}
+.score .w{font-size:11.5px;color:var(--muted)}
+.sparks{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.spark{border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--panel2)}
+.spark canvas{width:100%;height:60px;display:block}
+.lessons{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+
+#toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:15;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 14px;font-size:13px;max-width:min(560px,calc(100vw - 32px));opacity:0;transition:opacity .35s;pointer-events:none}
+#toast.show{opacity:1}
+#placehint{position:fixed;left:50%;top:calc(76px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:12;background:var(--sky);color:#1a0d07;font-weight:700;border-radius:999px;padding:7px 16px;font-size:13px;white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+
+/* ---------- Phone ---------- */
+@media (max-width:860px){
+  #hud{grid-template-columns:1fr;grid-template-rows:auto 1fr auto auto;gap:8px}
+  #topbar{grid-column:1;padding:6px 10px;gap:8px}
+  #topbar .brand,#season{display:none}
+  #leftp,#rightp{grid-column:1;grid-row:3;max-height:44vh;display:none}
+  #leftp.active,#rightp.active{display:flex}
+  #bottom{grid-column:1;grid-row:4;gap:8px}
+  #bottom{flex-wrap:wrap}
+  #logbox{display:none}
+  #logbox.active{display:flex;order:-1;flex-basis:100%;max-height:30vh;overflow:auto}
+  #tabs{display:flex;flex:1;gap:4px}
+  #tabs button{flex:1;border:1px solid var(--line);background:var(--panel);border-radius:6px;font-family:var(--f-display);font-weight:600;font-size:13px;padding:6px 2px}
+  #tabs button[aria-selected="true"]{border-color:var(--rust);color:var(--rust)}
+  #endbtn{min-width:120px;font-size:15px;padding:8px 10px}
+  .meters{grid-template-columns:1fr}
+  .card{padding:16px}
+}
+/* NASA + juice */
+.nphoto{margin:0;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel2);display:flex;flex-direction:column}
+.nphoto img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:#2a1c17}
+.nphoto figcaption{padding:8px 10px;font-size:12px;color:var(--muted);line-height:1.4}
+.nphoto figcaption b{color:var(--fg);display:block;font-size:13px}
+.nphoto figcaption a{color:var(--sky)}
+.nphoto.noimg img{display:none}
+.nphoto.wide{flex-direction:row}.nphoto.wide img{width:38%;aspect-ratio:auto;min-height:120px;flex:none}
+@media (max-width:620px){.nphoto.wide{flex-direction:column}.nphoto.wide img{width:100%;aspect-ratio:16/9}}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.tl{position:relative;height:64px;border-bottom:2px solid var(--line);margin:8px 14px 22px}
+.tlm{position:absolute;bottom:-20px;transform:translateX(-50%);font-size:11px;color:var(--muted);font-family:var(--f-mono)}
+.tld{position:absolute;bottom:10px;transform:translateX(-50%);width:20px;height:20px;border-radius:50%;border:2px solid var(--sky);background:color-mix(in srgb,var(--sky) 40%,transparent);padding:0;transition:transform .15s}
+.tld.hot{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 45%,transparent);width:26px;height:26px}
+.tld:hover,.tld.on{transform:translateX(-50%) scale(1.3)}
+.tld.on{box-shadow:0 0 0 3px var(--fg)}
+.thumb{width:100%;height:84px;object-fit:cover;border-radius:4px;display:block}
+.badges{display:flex;flex-wrap:wrap;gap:5px}
+.bdg{font-size:11px;padding:2px 8px;border-radius:999px;border:1px dashed var(--line);color:var(--muted)}
+.bdg.on{border-style:solid;border-color:var(--rust);color:var(--rust);background:color-mix(in srgb,var(--rust) 12%,transparent)}
+.tradechip{display:inline-block;font-family:var(--f-display);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--rust);border:1px solid color-mix(in srgb,var(--rust) 50%,transparent);border-radius:999px;padding:2px 9px}
+@keyframes shake{0%,100%{transform:none}20%{transform:translate(-6px,3px)}40%{transform:translate(5px,-4px)}60%{transform:translate(-4px,-2px)}80%{transform:translate(3px,4px)}}
+body.shake #hud,body.shake #world{animation:shake .5s}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:35;opacity:0;transition:opacity .6s}
+body.flash-red::after{background:rgba(255,70,50,.35);opacity:1;transition:none}
+body.flash-white::after{background:rgba(220,240,255,.55);opacity:1;transition:none}
+.title-actions{display:flex;gap:10px;flex-wrap:wrap}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<canvas id="world" aria-label="3D view of the Mars outpost"></canvas>
+
+<div id="hud" hidden>
+  <div id="topbar" class="panel">
+    <span class="brand">RED FRONTIER</span>
+    <div id="solbox"><span class="lbl">Sol</span><span class="big mono" id="solnum">1</span><span class="mono" style="color:var(--muted)" id="solof">/ 30</span></div>
+    <span id="weather" class="chip good"><span class="dot"></span>Clear sky</span>
+    <span id="sunchip" class="chip"><span class="mono">Sun 100%</span></span>
+    <div id="season"><span class="lbl">Spring</span><div class="track"><div class="pin" id="seasonpin"></div></div><span class="lbl">Winter</span></div>
+    <span style="flex:1"></span>
+    <button class="tbtn" data-act="dataroom">NASA data</button><button class="tbtn" data-act="sound" id="soundbtn" aria-pressed="true">Sound on</button><button class="tbtn" data-act="math" id="mathbtn" aria-pressed="false">Show the math</button>
+    <button class="tbtn" data-act="guide">Field guide</button>
+  </div>
+  <aside id="leftp" class="panel active" aria-label="Life support status"></aside>
+  <aside id="rightp" class="panel" aria-label="Crew and systems"></aside>
+  <div id="bottom">
+    <div id="logbox" class="panel" data-act="fulllog" title="Open the full mission log"></div>
+    <div id="tabs" role="tablist">
+      <button data-act="mtab" data-arg="leftp" aria-selected="true">Status</button>
+      <button data-act="mtab" data-arg="rightp" aria-selected="false">Crew</button>
+      <button data-act="mtab" data-arg="logbox" aria-selected="false">Log</button>
+    </div>
+    <button id="endbtn" data-act="endsol"><span>END SOL</span><small id="endsub">Run 24 h 37 min</small></button>
+  </div>
+</div>
+<div id="placehint" hidden></div>
+<div id="toast" role="status"></div>
+<div id="modal"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+   RED FRONTIER — Junior Astronaut Mission Trainer
+   Turn-based Mars outpost sim (3D, three.js) + 2D pixel rover expedition.
+   ===================================================================== */
+const $=s=>document.querySelector(s);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
+const fmt=(v,d=0)=>(Math.round(v*10**d)/10**d).toFixed(d);
+const sgn=(v,d=0)=>(v>=0?'+':'−')+fmt(Math.abs(v),d);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------------- Game data ---------------- */
+const CREW_PER_SOL={o2:0.84,water:2.5,food:1};   // per astronaut per sol (water = net loss after ~90% recycling)
+const CREW0=[
+  {name:'Amara Osei',role:'Engineer',color:'#f0a94a',perk:'Cleans and repairs 50% faster'},
+  {name:'Lin Wei',role:'Botanist',color:'#8ed38c',perk:'Farms 50% better'},
+  {name:'Diego Ramos',role:'Geologist',color:'#ff8a5c',perk:'Finds 50% more science'},
+  {name:'Nadia Haddad',role:'Medic',color:'#93cdee',perk:'Resting heals the whole crew'},
+];
+const TASKS={
+  hab:{label:'Hab ops',out:false,desc:'Run life support and cook. Small morale boost. Stays inside.'},
+  rest:{label:'Rest',out:false,desc:'Recover health and morale. Stays inside.'},
+  farm:{label:'Farm',out:false,desc:'Wash perchlorate out of greenhouse soil, then tend crops for bigger harvests.'},
+  maint:{label:'Maintain',out:true,desc:'Clean dust off solar panels and fix broken gear. Half a sol outside.'},
+  berm:{label:'Build berm',out:true,desc:'Pile regolith over the habitat for free radiation shielding. 8 crew-sols to finish. Outside.'},
+  eva:{label:'Science EVA',out:true,desc:'Explore and collect samples for science. Outside all sol: highest radiation dose.'},
+};
+const DEF={
+  solar:{name:'Solar Array',mass:1.2,cost:3,max:6,pad:true,use:0,stat:'+45 kWh per sol in full sun',
+    trade:'Light and cheap. Makes nothing at night, collects dust, and dust storms cut it by 75%.'},
+  reactor:{name:'Fission Reactor',mass:4,cost:18,max:1,pad:true,outer:true,use:0,stat:'+240 kWh per sol, day and night',
+    trade:'Heavy and expensive, but storms and darkness do not affect it. Must sit on the outer ring, far from the crew.'},
+  battery:{name:'Battery Bank',mass:0.8,cost:3,max:3,pad:true,use:0,stat:'Stores 150 kWh',
+    trade:'Makes no energy. Without enough storage, daytime solar power is wasted and the nights go cold.'},
+  drill:{name:'Ice Drill',mass:1.5,cost:6,max:2,pad:true,use:35,stat:'+45 L water per sol · uses 35 kWh',
+    trade:'Bores about 10 m down to buried ice. It turns power into water, so it needs a strong grid.'},
+  moxie:{name:'CO₂ Oxygen Maker',mass:1,cost:7,max:2,pad:true,use:40,stat:'+2.4 kg O₂ per sol · uses 40 kWh',
+    trade:'Splits oxygen out of the carbon dioxide air. Needs no water, but it is power hungry.'},
+  electro:{name:'Water Splitter',mass:0.8,cost:4,max:2,pad:true,use:30,stat:'5 L water → 4.4 kg O₂ per sol · 30 kWh',
+    trade:'Makes lots of oxygen, but every litre it splits is a litre nobody can drink.'},
+  greenhouse:{name:'Greenhouse',mass:2,cost:8,max:1,pad:true,use:50,stat:'+3 meals per sol once crops grow (8 sols)',
+    trade:'Fresh food and better morale. Uses 50 kWh and 12 L water per sol, and the soil must first be washed of toxic perchlorate.'},
+  rover:{name:'Science Rover',mass:2.5,cost:10,max:1,pad:true,use:0,stat:'Unlocks expeditions · +40% EVA science',
+    trade:'Heavy, and it makes no air, food or water. It is the reason the mission exists.'},
+  poly:{name:'Polyethylene Shield',mass:1,cost:9,max:1,pad:false,stat:'−30% radiation inside the habitat',
+    trade:'Light and ready on landing, but expensive. A regolith berm is free, but costs crew time outside.'},
+  spares:{name:'Spare Parts Kit',mass:0.3,cost:2,max:5,pad:false,stat:'Instantly repairs one breakdown',
+    trade:'Dead weight until something breaks. Then it is priceless.'},
+  o2tank:{name:'Oxygen Tanks',mass:1,cost:2,max:6,pad:false,stat:'+60 kg O₂ ≈ 18 sols for 4 crew',
+    trade:'Simple and reliable, but heavy. Pressure tanks weigh far more than the gas inside.'},
+  watertank:{name:'Water Tanks',mass:1,cost:1,max:3,pad:false,stat:'+800 L water',
+    trade:'Cheap. Spare water can also be pumped into the habitat walls as radiation shielding.'},
+  food:{name:'Food Crates',mass:1,cost:1,max:6,pad:false,stat:'+110 meals ≈ 27 sols for 4 crew',
+    trade:'Cheap and safe, but packaged food gets dull. Morale slowly drops without fresh crops.'},
+};
+const ORDER=['solar','reactor','battery','drill','moxie','electro','greenhouse','rover','poly','spares','o2tank','watertank','food'];
+const RANKS={
+  cadet:{label:'Cadet',N:30,mass:15,budget:50,dose:55,sci:80,spe:20,math:false,
+    blurb:'30 sols. Bigger budget, hints on, and a starter cargo plan if you want it.'},
+  commander:{label:'Commander',N:45,mass:15,budget:45,dose:60,sci:150,spe:25,math:true,
+    blurb:'45 sols into the polar winter. Tighter budget, more breakdowns, the math on screen.'},
+};
+const PRIOS=[['safety','Crew safety'],['science','Science'],['selfsuff','Living off Mars'],['budget','Saving money']];
+
+/* ---------------- State ---------------- */
+let S=null;
+function newState(rank){
+  const R=RANKS[rank];
+  return {rank,N:R.N,massCap:R.mass,budget:R.budget,doseLimit:R.dose,sciGoal:R.sci,speDose:R.spe,
+    phase:'title',math:R.math,weights:{safety:4,science:3,selfsuff:2,budget:1},
+    manifest:{},spent:0,massUsed:0,
+    sol:1,o2:10,water:40,food:12,battery:60,batCap:60,health:100,morale:80,science:0,
+    dust:1,storm:0,speToday:false,shelter:false,winter:false,winterMode:null,frost:0,
+    berm:0,waterWall:false,poly:false,spares:0,oven:false,drillSlow:0,roverCool:0,
+    gh:{soil:0,growth:0},modules:[],pending:[],nextId:1,
+    crew:CREW0.map(c=>({...c,task:'hab',dose:0})),
+    made:{o2:0,water:0,food:0},used:{o2:0,water:0,food:0},
+    hist:[],log:[],choices:[],seen:{},lastEvent:0,minBattery:999,blackouts:[],stormSolarMin:null,
+    script:{[Math.round(R.N*.27)]:'spe',[Math.round(R.N*.45)]:'storm',[Math.round(R.N*.62)]:'winter',[Math.round(R.N*.82)]:'spe2',[Math.round(R.N*.18)]:'downlink',[Math.round(R.N*.55)]:'sensors'},
+    last:null,failed:null,ended:false,sel:null,badges:[],quiz:{asked:[],right:0,total:0,streak:0},labDone:false,savedTasks:null};
+}
+
+/* ---------------- Physics of the outpost ---------------- */
+function sunFactor(sol=S.sol){return (1-0.45*(sol-1)/S.N)*(S.storm>0?0.25:1)}
+function coldFactor(sol=S.sol){return (sol-1)/S.N+(S.winter?0.2:0)}
+function active(m){return m.on&&!m.broken}
+function moduleUse(m){
+  if(!active(m))return 0;
+  if(m.type==='greenhouse')return S.gh.soil<2?10:50;
+  if(m.type==='electro'&&S.water<5)return 0;
+  return DEF[m.type].use||0;
+}
+function powerPlan(){
+  let sN=0,rN=0;
+  for(const m of S.modules){if(!active(m))continue;if(m.type==='solar')sN++;if(m.type==='reactor')rN++}
+  const sun=sunFactor();
+  const solar=sN*45*sun*S.dust, reactor=rN*240;
+  const cold=coldFactor();
+  const heat=40*cold+(S.winterMode==='heat'?20:0);
+  const hab=40+heat;
+  let mods=0;const modLines=[];
+  for(const m of S.modules){const u=moduleUse(m);if(u){mods+=u;modLines.push([DEF[m.type].name,u])}}
+  if(S.oven){mods+=25;modLines.push(['Sulfate oven',25])}
+  const load=hab+mods;
+  // night check: what the battery must cover after sunset
+  const nightNeed=Math.max(0,load/2-reactor/2);
+  return {sN,rN,sun,solar,reactor,cold,heat,hab,mods,modLines,load,net:solar+reactor-load,nightNeed};
+}
+function shieldMult(){return (1-0.45*S.berm/8)*(S.waterWall?0.65:1)*(S.poly?0.7:1)}
+function batCap(){return 60+150*S.modules.filter(m=>m.type==='battery'&&!m.broken).length}
+
+function simulateSol(){
+  const r={lines:[],o2:0,water:0,food:0,power:0,sci:0,dose:[0,0,0,0],notes:[]};
+  const before={o2:S.o2,water:S.water,food:S.food,battery:S.battery,health:S.health,morale:S.morale,science:S.science};
+  const C=S.crew;
+  const by=t=>C.filter(c=>c.task===t);
+  // ---- crew work
+  const mt=by('maint');
+  let repairs=0;
+  for(const c of mt){
+    const k=c.role==='Engineer'?1.5:1;
+    S.dust=Math.min(1,S.dust+0.25*k);
+    const br=S.modules.find(m=>m.broken);
+    if(br&&repairs<1+(c.role==='Engineer'?1:0)){br.broken=false;repairs++;r.notes.push(`${c.name.split(' ')[0]} repaired the ${DEF[br.type].name}.`)}
+  }
+  const gh=S.modules.find(m=>m.type==='greenhouse');
+  let farmBonus=0;
+  for(const c of by('farm')){
+    const k=c.role==='Botanist'?1.5:1;
+    if(!gh){r.notes.push(`${c.name.split(' ')[0]} had no greenhouse to farm.`);continue}
+    if(S.gh.soil<2){S.gh.soil=Math.min(2,S.gh.soil+k);S.water-=20;r.water-=20;
+      if(S.gh.soil>=2)r.notes.push('Greenhouse soil is clean of perchlorate. Seeds planted!');}
+    else farmBonus+=0.5*k;
+  }
+  const bermers=by('berm');
+  if(bermers.length&&S.berm<8){S.berm=Math.min(8,S.berm+bermers.length);if(S.berm>=8){r.notes.push('Regolith berm complete: radiation inside the hab cut by 45%.');setTimeout(()=>award('speed'),3400)}}
+  // ---- power
+  const P=powerPlan();
+  S.batCap=batCap();
+  let bat=Math.min(S.battery,S.batCap),deficit=0,wasted=0;
+  bat+=P.solar+P.reactor/2-P.load/2;
+  if(bat>S.batCap){wasted=bat-S.batCap;bat=S.batCap}
+  if(bat<0){deficit+=-bat;bat=0}
+  bat+=P.reactor/2-P.load/2;
+  if(bat<0){deficit+=-bat;bat=0}
+  S.battery=bat;S.minBattery=Math.min(S.minBattery,bat);
+  let f=1,habShort=0;
+  if(deficit>0){f=P.mods>0?Math.max(0,1-deficit/P.mods):0;habShort=Math.max(0,deficit-P.mods)}
+  if(S.storm>0&&P.sN){const pct=Math.round(P.sun*S.dust*100);S.stormSolarMin=S.stormSolarMin==null?pct:Math.min(S.stormSolarMin,pct)}
+  r.P=P;r.deficit=deficit;r.wasted=wasted;r.f=f;
+  r.lines.push(`<b>Power</b> solar ${fmt(P.solar)} (${P.sN}×45×${fmt(P.sun*100)}% sun×${fmt(S.dust*100)}% clean) + reactor ${fmt(P.reactor)} − load ${fmt(P.load)} kWh`);
+  r.lines.push(`  load = hab 40 + heating ${fmt(P.heat)} + machines ${fmt(P.mods)}`);
+  if(deficit>0)r.lines.push(`  shortfall ${fmt(deficit)} kWh → machines ran at ${fmt(f*100)}%`);
+  if(wasted>0)r.lines.push(`  ${fmt(wasted)} kWh wasted: batteries full`);
+  // ---- production
+  let o2p=0,wp=0,fp=0,wm=0;
+  for(const m of S.modules){
+    if(!active(m))continue;
+    if(m.type==='drill')wp+=45*f*(S.drillSlow>0?0.5:1);
+    if(m.type==='moxie')o2p+=2.4*f;
+    if(m.type==='electro'&&S.water>=5){wm+=5*f;o2p+=4.4*f}
+    if(m.type==='greenhouse'&&S.gh.soil>=2){wm+=12*f;S.gh.growth+=f;if(S.gh.growth>=8){fp+=(3+farmBonus)*f;o2p+=0.8*f}}
+  }
+  if(S.oven)wp+=15*f;
+  const n=C.length;
+  const o2use=CREW_PER_SOL.o2*n,wuse=CREW_PER_SOL.water*n,fuse=CREW_PER_SOL.food*n;
+  S.o2+=o2p-o2use;S.water+=wp-wm-wuse;S.food+=fp-fuse;
+  S.made.o2+=o2p;S.made.water+=wp;S.made.food+=fp;
+  S.used.o2+=o2use;S.used.water+=wuse;S.used.food+=fuse;
+  r.lines.push(`<b>Oxygen</b> made ${fmt(o2p,1)} − crew ${fmt(o2use,2)} (4×0.84 kg) = ${sgn(o2p-o2use,1)} kg`);
+  r.lines.push(`<b>Water</b> drilled ${fmt(wp)} − machines ${fmt(wm)} − crew ${fmt(wuse)} (4×2.5 L after recycling) = ${sgn(wp-wm-wuse)} L`);
+  r.lines.push(`<b>Food</b> grown ${fmt(fp,1)} − eaten ${fuse} meals = ${sgn(fp-fuse,1)}`);
+  // ---- health and shortages
+  let dh=0,dm=-1.5;
+  if(habShort>0){dh-=5+habShort/10;dm-=8;r.notes.push(`Blackout! Heaters failed for part of the night (${fmt(habShort)} kWh short).`);S.blackouts.push(S.sol)}
+  if(S.water<0){S.water=0;dh-=15;dm-=6;r.notes.push('The water ran out. The crew is dehydrated.')}
+  if(S.food<0){S.food=0;dh-=10;dm-=6;r.notes.push('The food ran out. The crew is going hungry.')}
+  if(S.winterMode==='bundle')dm-=1.5;
+  if(gh&&S.gh.growth>=8)dm+=1;
+  // ---- radiation
+  const sm=shieldMult();
+  C.forEach((c,i)=>{
+    const t=TASKS[c.task];
+    let d=c.task==='eva'?0.7:c.task==='berm'?0.62:c.task==='maint'?0.45+0.22*sm:0.45*sm;
+    if(S.speToday){
+      if(t.out)d+=c.task==='maint'?S.speDose*1.2:S.speDose*2;
+      else d+=S.speDose*sm*(S.shelter?0.5:1);
+    }
+    c.dose+=d;r.dose[i]=d;
+  });
+  r.lines.push(`<b>Radiation</b> inside 0.45 mSv × shield ${fmt(sm*100)}% · outside ≈0.7 mSv${S.speToday?` · SOLAR STORM +${S.speDose} mSv base`:''}`);
+  // ---- crew effects
+  let sciGain=0;
+  const rover=S.modules.some(m=>m.type==='rover'&&active(m));
+  const mf=S.morale<30?0.6:1;
+  C.forEach(c=>{
+    if(c.task==='hab')dm+=0.6;
+    if(c.task==='rest'){dm+=3;dh+=c.role==='Medic'?6:2}
+    if(c.task==='eva'){sciGain+=5*(c.role==='Geologist'?1.5:1)*(rover?1.4:1)*(S.storm>0?0.4:1)*mf;dm+=1}
+    if(c.task==='berm')dm-=1;
+    if(c.task==='farm')dm+=0.8;
+  });
+  if(S.morale<20)dh-=2;
+  S.science+=sciGain;r.sci=sciGain;
+  S.health=clamp(S.health+dh,0,100);S.morale=clamp(S.morale+dm,0,100);
+  r.dh=dh;r.dm=dm;
+  // ---- end of sol bookkeeping
+  r.delta={o2:S.o2-before.o2,water:S.water-before.water,food:S.food-before.food,battery:S.battery-before.battery,health:S.health-before.health,morale:S.morale-before.morale,science:S.science-before.science};
+  S.hist.push({sol:S.sol,o2:S.o2,water:S.water,food:S.food,battery:S.battery,batCap:S.batCap,health:S.health,morale:S.morale,science:S.science,dose:Math.max(...C.map(c=>c.dose))});
+  if(S.o2<=0){S.o2=0;S.failed='oxygen'}
+  else if(S.health<=0)S.failed='health';
+  else{const over=C.find(c=>c.dose>=S.doseLimit);if(over)S.failed='radiation:'+over.name}
+  S.last=r;
+  if(S.storm>0){S.storm--;if(S.storm===0){r.notes.push('The dust storm has cleared. Sunlight is back.');if(S.shed&&S.shed.length){S.modules.forEach(m=>{if(S.shed.includes(m.id))m.on=true});S.shed=null;r.notes.push('Machines switched off for the storm are back on.')}}}
+  if(S.drillSlow>0)S.drillSlow--;
+  if(S.roverCool>0)S.roverCool--;
+  S.dust=Math.max(0.35,S.dust-(S.storm>0?0.06:0.025));
+  S.speToday=false;S.shelter=false;
+  if(S.savedTasks){S.crew.forEach((c,i)=>c.task=S.savedTasks[i]);S.savedTasks=null;r.notes.push('The crew went back to their usual jobs.')}
+  S.frost=S.winter?Math.min(1,S.frost+0.12):Math.max(0,(S.sol/S.N-0.45)*0.6);
+  return r;
+}
+
+/* ---------------- Events (engineering decisions) ---------------- */
+function mkEvent(key){
+  const ghm=S.modules.find(m=>m.type==='greenhouse');
+  const hasReactor=S.modules.some(m=>m.type==='reactor');
+  switch(key){
+  case 'spe':case 'spe2':return {key,kind:'bad',title:'Solar storm warning',
+    text:`A flare just erupted on the Sun. A wave of fast protons will reach Mars within hours and hit the outpost during this sol. Anyone outside takes about ${S.speDose*2} mSv. Inside, the dose depends on your shielding (now ${Math.round(shieldMult()*100)}% gets through).${realSep()}`,
+    fact:'Earth’s magnetic field and thick air shield us from most space radiation. Mars lost its global magnetic field long ago and its air is about 1% as thick as ours.',
+    opts:[
+      {l:'Everyone into the storm shelter',d:'Cancel all outdoor work. The crew sleeps in the shelter lined with water and food stores, which halves the dose inside.',tags:['+radiation safety','−science today','−berm progress'],
+        go(){saveTasks();S.crew.forEach(c=>{if(TASKS[c.task].out)c.task='hab'});S.shelter=true;S.speToday=true},lesson:'You sheltered from a solar storm. Real Mars habitats plan a small, extra-shielded room for exactly this.'},
+      ...(S.water>=400&&!S.waterWall?[{l:'Pump 400 L of water into the walls',d:'Water is great at stopping protons. Fill the water wall now and keep it as permanent shielding.',tags:['−400 L water','+35% shielding forever'],
+        go(){S.water-=400;S.waterWall=true;saveTasks();S.crew.forEach(c=>{if(TASKS[c.task].out)c.task='hab'});S.speToday=true;world.syncShields()},lesson:'You turned drinking water into a radiation shield: one resource doing two jobs is a classic space-engineering trick.'}]:[]),
+      {l:'Keep today’s plan',d:'Outdoor work goes ahead. Faster progress, much bigger doses.',tags:['+progress','−crew dose'],
+        go(){S.speToday=true},lesson:'You kept working through a solar storm. Progress versus safety is a trade-off every mission faces.'},
+    ]};
+  case 'storm':{const d=4+Math.floor(Math.random()*3);return {key,kind:'bad',title:'Dust storm rolling in',
+    text:`Orbiting satellites see a regional dust storm heading for the outpost. For about ${d} sols the dust will block roughly 75% of the sunlight. ${hasReactor?'Your reactor does not care about dust.':'Your solar arrays will barely work.'}`,
+    fact:'In 2018 a planet-wide dust storm blocked so much sunlight that the solar-powered Opportunity rover lost power and never woke up again.',
+    opts:[
+      {l:'Shed load now',d:'Switch off the greenhouse, ice drill and oxygen makers until the sky clears. Keep heat and air running.',tags:['+power safety','−production'],
+        go(){S.storm=d;S.shed=[];S.modules.forEach(m=>{if(['greenhouse','drill','moxie','electro'].includes(m.type)&&m.on){m.on=false;S.shed.push(m.id)}});world.syncModules()},lesson:'You shed load before a dust storm. Engineers decide in advance which systems get switched off first.'},
+      {l:'Ride it out',d:'Keep everything on and trust the batteries. You can still switch things off later in Systems.',tags:['+production','−blackout risk'],
+        go(){S.storm=d},lesson:'You kept everything running into a dust storm, betting on stored energy.'},
+    ]};}
+  case 'downlink':return {key,kind:'info',title:'Science data is ready to send',
+    text:`Diego’s rock measurements are packed and ready. Earth is about ${pick([5,9,14,20])} light-minutes away today, so even a radio message takes a while.`,
+    fact:'Most rover data reaches Earth through relay orbiters such as Mars Reconnaissance Orbiter, which can send far more data than a rover’s own antenna.',
+    opts:[
+      {l:'Send a small summary now',d:'Low-resolution results go straight to Earth. Scientists reply quickly with tips.',tags:['+5 science','+4 morale','−detail'],go(){S.science+=5;S.morale=Math.min(100,S.morale+4)},lesson:'You chose low latency: a quick, small answer.'},
+      {l:'Wait for tonight’s orbiter relay',d:'Send the full data pack through an orbiter overhead. Much more science, but no reply for a while.',tags:['+14 science','−slow feedback'],go(){S.science+=14},lesson:'You chose high throughput: more data, delivered later.'},
+    ]};
+  case 'sensors':return {key,kind:'bad',title:'Two sensors disagree',
+    text:'One oxygen sensor reads 21% oxygen in the cabin. The backup reads 18%. One of them is wrong, and you cannot tell which yet.',
+    fact:'Spacecraft carry two or three copies of critical sensors. When they disagree, engineers must choose between stopping to check and carrying on.',
+    opts:[
+      {l:'Stop and recalibrate',d:'Pause the air system while the crew checks both sensors. Some oxygen is vented for the test.',tags:['+certainty','−4 kg O₂','−morale'],go(){S.o2=Math.max(.5,S.o2-4);S.morale-=2},lesson:'You chose consistency: stop until the data agrees.'},
+      {l:'Keep running on the newer sensor',d:'Stay available. If you trusted the wrong sensor, the crew may feel unwell.',tags:['+no downtime','−health risk'],go(){if(Math.random()<.4){S.health-=10;log('The newer sensor was wrong. The crew had headaches from low oxygen.')}else log('Good call: the newer sensor was right.')},lesson:'You chose availability: keep running on a best guess.'},
+    ]};
+  case 'winter':return {key,kind:'info',title:'Polar winter is coming',
+    text:'At the north pole it is getting so cold that carbon dioxide freezes straight out of the air as frost and snow. So much freezes that the air pressure on Mars drops by about a quarter. Heating will cost more power from now on.',
+    fact:'Night on Mars can drop to −80 °C to −100 °C. The seasonal CO₂ ice cap can grow about a metre thick at the poles.',
+    opts:[
+      {l:'Run the heaters harder',d:'Keep the habitat comfortable. Costs 20 kWh more every sol.',tags:['−20 kWh/sol','+morale'],go(){S.winter=true;S.winterMode='heat'},lesson:'You paid for winter comfort with power. Comfort affects how well people work.'},
+      {l:'Bundle up and turn it down',d:'Keep the thermostat low and wear extra layers. No extra power, but the crew gets grumpy.',tags:['+power','−morale each sol'],go(){S.winter=true;S.winterMode='bundle'},lesson:'You saved power by lowering the temperature. Saving resources often costs people something.'},
+    ]};
+  case 'leak':return {key,kind:'bad',title:'Air leak in the habitat',
+    text:'A seal on the airlock door is hissing. The outpost lost 12 kg of oxygen before the alarm caught it.',
+    fact:'Air pressure outside is less than 1% of Earth’s, so even a tiny gap leaks air fast.',
+    pre(){S.o2=Math.max(0.5,S.o2-12)},
+    opts:[
+      {l:'Use a spare part',d:'Swap in a new seal right away.',tags:['−1 spare part'],dis:S.spares<1,go(){S.spares--},lesson:'A spare part fixed the leak instantly. Carrying spares is heavier, but buys you safety.'},
+      {l:'Patch it by hand',d:'The crew improvises a fix. It holds, but leaks another 8 kg first.',tags:['−8 kg O₂','−morale'],go(){S.o2=Math.max(0.5,S.o2-8);S.morale-=4},lesson:'You patched a leak without spares and lost more air while doing it.'},
+    ]};
+  case 'failure':{const cand=S.modules.filter(m=>active(m)&&m.type!=='rover');if(!cand.length)return null;const m=pick(cand);
+    return {key,kind:'bad',title:`${DEF[m.type].name} broke down`,
+    text:`Fine dust got into the ${DEF[m.type].name.toLowerCase()} and it stopped working.`,
+    fact:'Martian dust is finer than flour and slightly electrically charged, so it sticks to everything, including moving parts.',
+    pre(){m.broken=true;world.syncModules()},
+    opts:[
+      {l:'Use a spare part',d:'Fixed right now.',tags:['−1 spare part'],dis:S.spares<1,go(){S.spares--;m.broken=false;world.syncModules()},lesson:'Spares turned a breakdown into a minor delay.'},
+      {l:'Assign it to maintenance',d:'Stays broken until someone does a Maintain shift.',tags:['−crew time','−production'],go(){},lesson:'Without spares, a breakdown cost crew time instead of mass.'},
+    ]};}
+  case 'perchlorate':return {key,kind:'bad',title:'Toxic dust inside',
+    text:'Regolith dust tracked in on spacesuits contains perchlorate salts. Swallowed or breathed in over time, perchlorate stops the thyroid gland from using iodine properly.',
+    fact:'The Phoenix lander discovered perchlorate in Martian soil in 2008, near where your outpost stands.',
+    opts:[
+      {l:'Deep clean and hand out iodine',d:'Scrub every surface with water and give the crew iodine supplements to protect their thyroids.',tags:['−30 L water','+health'],go(){S.water=Math.max(0,S.water-30);S.health=Math.min(100,S.health+2)},lesson:'You cleaned out perchlorate and used iodine supplements, the same counter-measure the experts suggest.'},
+      {l:'Quick wipe-down',d:'Save water and time. Some dust stays.',tags:['+water','−health'],go(){S.health-=8},lesson:'You saved water but the crew was exposed to perchlorate.'},
+    ]};
+  case 'devil':return {key,kind:'good',title:'A dust devil swept the arrays',
+    text:'A spinning dust devil passed over the outpost and blew the dust off your solar panels. Free cleaning!',
+    fact:'The Spirit and Opportunity rovers were kept alive for years by lucky dust devils cleaning their panels.',
+    pre(){S.dust=1},opts:[{l:'Lucky us',d:'Panels are 100% clean.',tags:['+power'],go(){},lesson:null}]};
+  case 'homesick':return {key,kind:'info',title:'The crew misses home',
+    text:'Living in a small tin can far from everyone they love is getting to the crew.',
+    fact:'Radio signals take between about 3 and 22 minutes to travel from Mars to Earth, so live video calls are impossible.',
+    opts:[
+      {l:'Give everyone a rest sol',d:'All four crew rest this sol.',tags:['+morale','+health','−work today'],go(){saveTasks();S.crew.forEach(c=>c.task='rest')},lesson:'You traded a day of work for crew wellbeing.'},
+      {l:'Play recorded messages from family',d:'Not live, but it helps a bit.',tags:['+small morale'],go(){S.morale=Math.min(100,S.morale+6)},lesson:null},
+    ]};
+  case 'sulfate':return {key,kind:'good',title:'Sulfate minerals found',
+    text:'Diego found a layer of sulfate minerals right next to the outpost. Sulfate crystals lock water inside them. Bake them and the water comes out.',
+    fact:'Orbiters and rovers have found sulfate minerals across Mars, a clue that liquid water once flowed there.',
+    opts:[
+      {l:'Build a sulfate oven',d:'Uses a spare part. Adds 15 L of water per sol, but costs 25 kWh per sol.',tags:['−1 spare','+15 L/sol','−25 kWh/sol'],dis:S.spares<1,go(){S.spares--;S.oven=true},lesson:'You built a sulfate oven: trading power for water, a core idea of living off the land.'},
+      {l:'Study it instead',d:'Take samples for scientists back home.',tags:['+12 science'],go(){S.science+=12},lesson:null},
+    ]};
+  case 'drilljam':{const d=S.modules.find(m=>m.type==='drill'&&active(m));if(!d)return null;return {key,kind:'bad',title:'Drill hit hard rock',
+    text:'At 8 m the ice drill hit a layer of volcanic basalt. It will only make half its water for 5 sols unless you swap the drill bit.',
+    fact:'Most Martian rock is volcanic. Mars has the biggest volcano in the Solar System, Olympus Mons, almost 22 km tall.',
+    opts:[
+      {l:'Swap the bit (spare part)',d:'Back to full speed.',tags:['−1 spare'],dis:S.spares<1,go(){S.spares--},lesson:null},
+      {l:'Keep drilling slowly',d:'Half water for 5 sols.',tags:['−water output'],go(){S.drillSlow=5},lesson:'You accepted slower drilling instead of spending a spare.'},
+    ]};}
+  }
+  return null;
+}
+const EV_IMG={spe:'PIA26302',spe2:'PIA26302',storm:'PIA22521',winter:'PIA12338',perchlorate:'PIA10959',devil:'PIA12120',homesick:'PIA19400',drilljam:'PIA10906'};
+const EV_TRADE={spe:'safety',spe2:'safety',storm:'safety',leak:'quality',failure:'quality',drilljam:'quality',homesick:'latency',downlink:'latency',sensors:'consist'};
+function realSep(){const e=pick(NASA.sepEvents);if(!e)return '';const st=sepStats(1);return `<span class="didyou" style="display:block;margin-top:10px"><b>Based on real NASA data:</b> on ${e.date} satellites near Earth recorded a storm of protons above ${e.over100?'100':'10'} MeV${e.flare?`, set off by a solar flare at ${e.flare.slice(11)} UTC`:''}. Last year storms like this came about once every ${Math.round(st.days/st.n)} days.</span>`}
+function saveTasks(){if(!S.savedTasks)S.savedTasks=S.crew.map(c=>c.task)}
+function chooseEvent(){
+  const s=S.sol;
+  const sc=S.script[s];
+  if(sc&&!S.seen[sc]){S.seen[sc]=1;return mkEvent(sc)}
+  if(s<3||s-S.lastEvent<2)return null;
+  const chance=S.rank==='commander'?0.4:0.3;
+  if(Math.random()>chance)return null;
+  const pool=['leak','failure','homesick'];
+  if(S.rank==='commander')pool.push('failure');
+  if(!S.seen.sulfate)pool.push('sulfate');
+  if(S.modules.some(m=>m.type==='solar')&&S.dust<0.8&&!S.seen.devilRecent)pool.push('devil','devil');
+  if(S.gh.soil>=2&&!S.seen.perchlorate)pool.push('perchlorate','perchlorate');
+  if(S.modules.some(m=>m.type==='drill')&&!S.seen.drilljam)pool.push('drilljam');
+  const k=pick(pool);const ev=mkEvent(k);
+  if(ev&&['sulfate','perchlorate','drilljam'].includes(k))S.seen[k]=1;
+  return ev;
+}
+
+/* ---------------- 3D WORLD ---------------- */
+const world=(()=>{
+  const cv=$('#world');
+  let renderer,scene,camera,hemi,sunL,sunDisc,stars,terrain,terrColors,baseColors,dustPts,padGroup,hab,berm,wall,polyShell;
+  const pads=[];const modMeshes=new Map();const astronauts=[];let roverMesh=null;
+  const cam={theta:0.9,phi:1.0,r:62,auto:true,tr:62};
+  let tod=0.42,anim=null,frostShown=-1,placing=null;
+  const CR=[{x:70,z:-40,r:14,d:4},{x:-90,z:30,r:22,d:6},{x:30,z:95,r:10,d:3},{x:-50,z:-100,r:16,d:4},{x:110,z:60,r:9,d:3}];
+  function hash(x,y){let h=Math.imul(x|0,374761393)^Math.imul(y|0,668265263);h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return (h>>>0)/4294967296}
+  function vn(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+    const a=hash(xi,yi),b=hash(xi+1,yi),c=hash(xi,yi+1),d=hash(xi+1,yi+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v}
+  function fbm(x,y){let s=0,a=1,f=1,n=0;for(let i=0;i<5;i++){s+=a*vn(x*f,y*f);n+=a;a*=.5;f*=2}return s/n}
+  function H(x,z){
+    let h=(fbm(x*.022+10,z*.022+10)-.5)*18+Math.sin(x*.07+z*.03)*.5;
+    for(const c of CR){const d=Math.hypot(x-c.x,z-c.z)/c.r;if(d<1.6)h+=(d<1?-c.d*(1-d*d):0)+c.d*.4*Math.exp(-(((d-1)/.2)**2))}
+    const r=Math.hypot(x,z);return h*smooth(28,48,r);
+  }
+  function init(){
+    try{renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,powerPreference:'high-performance'})}catch(e){return false}
+    renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+    renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    scene=new THREE.Scene();scene.fog=new THREE.Fog(0xc9a27a,70,230);
+    camera=new THREE.PerspectiveCamera(48,1,.1,900);
+    hemi=new THREE.HemisphereLight(0xffe4c8,0x5a2a18,.65);scene.add(hemi);
+    sunL=new THREE.DirectionalLight(0xfff0dc,1.15);sunL.castShadow=true;sunL.shadow.mapSize.set(2048,2048);
+    Object.assign(sunL.shadow.camera,{left:-45,right:45,top:45,bottom:-45,near:1,far:400});sunL.shadow.bias=-0.0006;
+    scene.add(sunL,sunL.target);
+    sunDisc=new THREE.Mesh(new THREE.SphereGeometry(6,16,12),new THREE.MeshBasicMaterial({color:0xfff6e8,fog:false}));scene.add(sunDisc);
+    // terrain
+    const g=new THREE.PlaneGeometry(420,420,170,170);g.rotateX(-Math.PI/2);
+    const p=g.attributes.position;const col=new Float32Array(p.count*3);baseColors=new Float32Array(p.count*3);
+    for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);const y=H(x,z);p.setY(i,y);
+      const n=fbm(x*.08,z*.08),m=fbm(x*.01+50,z*.01);
+      const c=[lerp(.50,.70,n)*lerp(.8,1.05,m),lerp(.24,.36,n)*lerp(.85,1,m),lerp(.13,.2,n)];
+      if(y<-2){c[0]*=.82;c[1]*=.82;c[2]*=.85}
+      baseColors.set(c,i*3);col.set(c,i*3)}
+    g.setAttribute('color',new THREE.BufferAttribute(col,3));g.computeVertexNormals();terrColors=g.attributes.color;
+    terrain=new THREE.Mesh(g,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,metalness:0,flatShading:true}));
+    terrain.receiveShadow=true;scene.add(terrain);
+    // rocks
+    const rg=new THREE.DodecahedronGeometry(1,0);const rm=new THREE.MeshStandardMaterial({color:0x5b3426,roughness:1,flatShading:true});
+    const rocks=new THREE.InstancedMesh(rg,rm,320);const o=new THREE.Object3D();
+    for(let i=0;i<320;i++){const a=Math.random()*Math.PI*2,r=30+Math.random()*170;const x=Math.cos(a)*r,z=Math.sin(a)*r;
+      const s=.25+Math.random()**3*2.2;o.position.set(x,H(x,z)+s*.25,z);o.scale.set(s*(1+Math.random()*.5),s*.7,s);o.rotation.set(Math.random()*3,Math.random()*3,0);o.updateMatrix();rocks.setMatrixAt(i,o.matrix)}
+    rocks.castShadow=true;rocks.receiveShadow=true;scene.add(rocks);
+    // stars
+    const sg=new THREE.BufferGeometry();const sp=[];
+    for(let i=0;i<1600;i++){const u=Math.random()*Math.PI*2,v=Math.acos(Math.random()*.95);sp.push(Math.sin(v)*Math.cos(u)*500,Math.cos(v)*500,Math.sin(v)*Math.sin(u)*500)}
+    sg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));
+    stars=new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:1.6,sizeAttenuation:false,transparent:true,opacity:0,fog:false}));scene.add(stars);
+    // dust storm particles
+    const dg=new THREE.BufferGeometry();const dp=new Float32Array(3000*3);
+    for(let i=0;i<3000;i++){dp[i*3]=(Math.random()-.5)*220;dp[i*3+1]=Math.random()*40;dp[i*3+2]=(Math.random()-.5)*220}
+    dg.setAttribute('position',new THREE.BufferAttribute(dp,3));
+    dustPts=new THREE.Points(dg,new THREE.PointsMaterial({color:0xb0754a,size:.7,transparent:true,opacity:.75}));dustPts.visible=false;scene.add(dustPts);
+    buildPads();buildHab();buildAstronauts();
+    resize();addEventListener('resize',resize);
+    bindControls();
+    requestAnimationFrame(loop);
+    return true;
+  }
+  /* ---- materials ---- */
+  const M=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.7,metalness:.1},o));
+  function shadowAll(g){g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});return g}
+  function padPos(i){const inner=i<6;const a=(inner?i:i-6+.5)*Math.PI/3+.3;const r=inner?12:22;return {x:Math.cos(a)*r,z:Math.sin(a)*r,outer:!inner}}
+  function buildPads(){
+    padGroup=new THREE.Group();scene.add(padGroup);
+    for(let i=0;i<12;i++){const pp=padPos(i);
+      const pad=new THREE.Mesh(new THREE.CylinderGeometry(3,3.2,.3,28),M(0x6f5a50,{roughness:.95}));pad.position.set(pp.x,.15,pp.z);pad.receiveShadow=true;
+      const ring=new THREE.Mesh(new THREE.RingGeometry(3.3,3.9,40),new THREE.MeshBasicMaterial({color:0x8fd8f2,transparent:true,opacity:.9,side:THREE.DoubleSide}));
+      ring.rotation.x=-Math.PI/2;ring.position.set(pp.x,.34,pp.z);ring.visible=false;
+      pad.userData.pad=i;padGroup.add(pad,ring);pads.push({mesh:pad,ring,...pp,i});
+      // cable trench to hab
+      const len=Math.hypot(pp.x,pp.z)-7.5;const cab=new THREE.Mesh(new THREE.BoxGeometry(.25,.06,len),M(0x3d2a22));
+      cab.position.set(pp.x*(1-(len/2+3.2)/Math.hypot(pp.x,pp.z)),.04,pp.z*(1-(len/2+3.2)/Math.hypot(pp.x,pp.z)));cab.lookAt(0,.04,0);padGroup.add(cab)}
+  }
+  function buildHab(){
+    hab=new THREE.Group();
+    const base=new THREE.Mesh(new THREE.CylinderGeometry(4.6,4.8,1.6,40),M(0xe9e3dc));base.position.y=.8;
+    const band=new THREE.Mesh(new THREE.CylinderGeometry(4.62,4.62,.45,40,1,true),M(0x2a2f38,{emissive:0xffc070,emissiveIntensity:.25}));band.position.y=1.2;band.userData.win=true;
+    const dome=new THREE.Mesh(new THREE.SphereGeometry(4.6,40,20,0,Math.PI*2,0,Math.PI/2),M(0xf2ede6,{roughness:.55}));dome.position.y=1.6;
+    const lock=new THREE.Mesh(new THREE.BoxGeometry(2.2,2.4,2.6),M(0xd9d2ca));lock.position.set(5,1.2,0);
+    const door=new THREE.Mesh(new THREE.BoxGeometry(.1,1.6,1.1),M(0xff7d45,{emissive:0x401000}));door.position.set(6.12,1.1,0);
+    const mast=new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,4.5,8),M(0xbbbbbb));mast.position.set(-2,7,1.2);
+    const dish=new THREE.Mesh(new THREE.SphereGeometry(1.1,20,10,0,Math.PI*2,0,Math.PI/3.2),M(0xffffff,{side:THREE.DoubleSide}));dish.position.set(-2,9.2,1.2);dish.rotation.x=-.9;
+    const flag=new THREE.Mesh(new THREE.BoxGeometry(.05,.5,.8),M(0xff7d45));flag.position.set(-2,8.8,1.6);
+    hab.add(base,band,dome,lock,door,mast,dish,flag);
+    hab.userData.mod='hab';
+    scene.add(shadowAll(hab));
+    berm=new THREE.Mesh(new THREE.TorusGeometry(6.2,1.7,10,48,Math.PI*1.75),M(0x9a5634,{roughness:1,flatShading:true}));
+    berm.rotation.x=-Math.PI/2;berm.rotation.z=.48;berm.position.y=0;berm.scale.z=0.01;berm.castShadow=berm.receiveShadow=true;scene.add(berm);
+    wall=new THREE.Mesh(new THREE.CylinderGeometry(4.95,4.95,1.65,40,1,true),M(0x4aa3d6,{transparent:true,opacity:.55,emissive:0x0b3550,emissiveIntensity:.6}));wall.position.y=.82;wall.visible=false;scene.add(wall);
+    polyShell=new THREE.Mesh(new THREE.SphereGeometry(4.85,20,10,0,Math.PI*2,0,Math.PI/2),M(0xffffff,{wireframe:true,transparent:true,opacity:.55}));polyShell.position.y=1.6;polyShell.visible=false;scene.add(polyShell);
+  }
+  function suit(color){const g=new THREE.Group();
+    const body=new THREE.Mesh(new THREE.CylinderGeometry(.32,.36,1,10),M(0xf4f1ec));body.position.y=.9;
+    const pack=new THREE.Mesh(new THREE.BoxGeometry(.5,.6,.25),M(0xd8d2c8));pack.position.set(0,1.05,-.3);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(.3,14,10),M(0xf4f1ec));head.position.y=1.6;
+    const visor=new THREE.Mesh(new THREE.SphereGeometry(.24,14,10,0,Math.PI),M(0xffc24d,{metalness:.8,roughness:.2}));visor.position.set(0,1.6,.1);
+    const stripe=new THREE.Mesh(new THREE.CylinderGeometry(.37,.37,.1,10),M(color));stripe.position.y=1.15;
+    const l1=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.5,6),M(0xe8e3dc));l1.position.set(-.14,.25,0);
+    const l2=l1.clone();l2.position.x=.14;g.add(body,pack,head,visor,stripe,l1,l2);g.userData.legs=[l1,l2];return shadowAll(g)}
+  function buildAstronauts(){CREW0.forEach((c,i)=>{const a=suit(new THREE.Color(c.color));a.visible=false;a.position.set(6,0,0);a.userData.target=new THREE.Vector3(8,0,2);scene.add(a);astronauts.push(a)})}
+  /* ---- module meshes ---- */
+  function beacon(g,y){const b=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),new THREE.MeshBasicMaterial({color:0x40ff80}));b.position.y=y;b.userData.beacon=true;g.add(b);g.userData.beacon=b}
+  function makeMesh(type){
+    const g=new THREE.Group();
+    if(type==='solar'){
+      const post=new THREE.Mesh(new THREE.CylinderGeometry(.15,.15,1.6,8),M(0x999999));post.position.y=.9;
+      for(let k=-1;k<=1;k+=2){const pnl=new THREE.Mesh(new THREE.BoxGeometry(2.4,.08,3.6),M(0x1d3b6e,{metalness:.5,roughness:.35}));pnl.position.set(k*1.25,1.75,0);pnl.rotation.z=-k*.08;pnl.rotation.x=-.45;pnl.userData.panel=true;g.add(pnl)}
+      g.add(post);beacon(g,.6);
+    }else if(type==='reactor'){
+      const core=new THREE.Mesh(new THREE.CylinderGeometry(1,1.2,3.2,20),M(0x8e959c,{metalness:.6,roughness:.4}));core.position.y=1.9;
+      for(let k=0;k<4;k++){const fin=new THREE.Mesh(new THREE.BoxGeometry(.1,3.4,2.6),M(0x3b3f46,{metalness:.4}));fin.position.y=2.2;fin.rotation.y=k*Math.PI/4;g.add(fin)}
+      const cap=new THREE.Mesh(new THREE.CylinderGeometry(.6,1,.5,20),M(0xffc93d,{emissive:0x553300}));cap.position.y=3.75;
+      const glow=new THREE.PointLight(0xffb060,.6,10);glow.position.y=4;g.add(core,cap,glow);beacon(g,4.3);
+    }else if(type==='battery'){
+      const box=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.5,2),M(0x30353b,{metalness:.5}));box.position.y=1;
+      const strip=new THREE.Mesh(new THREE.BoxGeometry(3.22,.15,2.02),M(0x40ff9a,{emissive:0x20ff80,emissiveIntensity:.8}));strip.position.y=1.5;strip.userData.charge=true;
+      g.add(box,strip);beacon(g,2);
+    }else if(type==='drill'){
+      for(let k=0;k<4;k++){const leg=new THREE.Mesh(new THREE.BoxGeometry(.18,6,.18),M(0xd78a2c,{metalness:.3}));const a=k*Math.PI/2+Math.PI/4;
+        leg.position.set(Math.cos(a)*1,3,Math.sin(a)*1);leg.rotation.set(Math.sin(a)*.18,0,-Math.cos(a)*.18);g.add(leg)}
+      const head=new THREE.Mesh(new THREE.BoxGeometry(1.1,.7,1.1),M(0x444a52));head.position.y=5.8;
+      const bit=new THREE.Mesh(new THREE.CylinderGeometry(.18,.05,5.4,6),M(0xcfd4da,{metalness:.8,roughness:.3}));bit.position.y=2.9;bit.userData.spin=true;
+      const tank=new THREE.Mesh(new THREE.CylinderGeometry(.7,.7,1.4,14),M(0x5fb6e0));tank.position.set(2,.7,0);
+      g.add(head,bit,tank);beacon(g,6.4);
+    }else if(type==='moxie'){
+      const box=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.8,2),M(0xd4a640,{metalness:.7,roughness:.35}));box.position.y=1.1;
+      const intake=new THREE.Mesh(new THREE.CylinderGeometry(.4,.5,1.2,12),M(0x666c74));intake.position.set(-.6,2.4,0);
+      const fan=new THREE.Mesh(new THREE.BoxGeometry(.7,.06,.12),M(0x222222));fan.position.set(-.6,3.05,0);fan.userData.spin=true;
+      const tank=new THREE.Mesh(new THREE.SphereGeometry(.7,14,10),M(0x80e0a0));tank.position.set(.9,2.4,0);
+      g.add(box,intake,fan,tank);beacon(g,3.3);
+    }else if(type==='electro'){
+      for(let k=-1;k<=1;k+=2){const t=new THREE.Mesh(new THREE.CylinderGeometry(.7,.7,2.4,16),M(k<0?0xeef3f6:0x5fb6e0));t.position.set(k*.9,1.4,0);
+        const c=new THREE.Mesh(new THREE.SphereGeometry(.7,16,8),t.material);c.position.set(k*.9,2.6,0);g.add(t,c)}
+      const pipe=new THREE.Mesh(new THREE.BoxGeometry(1.8,.2,.2),M(0x999999));pipe.position.y=2.2;g.add(pipe);beacon(g,3.5);
+    }else if(type==='greenhouse'){
+      const shell=new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.4,5.4,24,1,true,0,Math.PI),M(0xcfe8ff,{transparent:true,opacity:.32,roughness:.1,side:THREE.DoubleSide}));
+      shell.rotation.set(0,0,Math.PI/2);shell.position.y=.3;
+      const floor=new THREE.Mesh(new THREE.BoxGeometry(5.2,.3,4.6),M(0x4a2c1e));floor.position.y=.3;
+      const rows=new THREE.Group();for(let k=-1;k<=1;k++){const r=new THREE.Mesh(new THREE.BoxGeometry(4.6,.5,.9),M(0x3fae4c,{emissive:0x0a3010}));r.position.set(0,.7,k*1.3);r.userData.crop=true;rows.add(r)}
+      const light=new THREE.PointLight(0xff4fd8,0,9);light.position.y=2;g.userData.growlight=light;
+      g.add(shell,floor,rows,light);g.userData.rows=rows;beacon(g,2.8);
+    }else if(type==='rover'){
+      const body=new THREE.Mesh(new THREE.BoxGeometry(3.6,1.1,2.2),M(0xeeeae4));body.position.y=1.2;
+      const cab=new THREE.Mesh(new THREE.BoxGeometry(1.6,.9,2),M(0x2a2f38,{metalness:.6,roughness:.2}));cab.position.set(1,2.1,0);
+      const stripe=new THREE.Mesh(new THREE.BoxGeometry(3.62,.18,2.22),M(0xff7d45));stripe.position.y=1.1;
+      g.add(body,cab,stripe);
+      for(let k=0;k<6;k++){const w=new THREE.Mesh(new THREE.CylinderGeometry(.45,.45,.35,12),M(0x2a2a2a));w.rotation.x=Math.PI/2;w.position.set(-1.3+(k%3)*1.3,.45,k<3?1.2:-1.2);g.add(w)}
+      const mast=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,1.2,6),M(0xcccccc));mast.position.set(-1.2,2.3,.6);g.add(mast);beacon(g,3);
+    }
+    return shadowAll(g);
+  }
+  function syncModules(){
+    if(!scene||!S)return;
+    for(const [id,g] of modMeshes){if(!S.modules.find(m=>m.id===id)){scene.remove(g);modMeshes.delete(id)}}
+    for(const m of S.modules){
+      let g=modMeshes.get(m.id);
+      if(!g){g=makeMesh(m.type);const pp=padPos(m.pad);g.position.set(pp.x,.3,pp.z);g.rotation.y=-Math.atan2(pp.z,pp.x)+Math.PI/2;
+        g.userData.modId=m.id;g.userData.home=g.position.clone();g.userData.homeRot=g.rotation.y;scene.add(g);modMeshes.set(m.id,g);
+        g.scale.setScalar(.01);g.userData.grow=0;if(m.type==='rover')roverMesh=g}
+    }
+    syncShields();
+  }
+  function syncShields(){if(!S||!berm)return;berm.scale.z=Math.max(.01,S.berm/8);berm.visible=S.berm>0;wall.visible=!!S.waterWall;polyShell.visible=!!S.poly}
+  function setFrost(f){if(Math.abs(f-frostShown)<.04)return;frostShown=f;const p=terrain.geometry.attributes.position;
+    for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);const mask=clamp(f*1.6-(vn(x*.06,z*.06))*.9,0,1)*.85;
+      terrColors.setXYZ(i,lerp(baseColors[i*3],.92,mask),lerp(baseColors[i*3+1],.9,mask),lerp(baseColors[i*3+2],.92,mask))}
+    terrColors.needsUpdate=true}
+  function setPlacing(type){placing=type;for(const p of pads){const occ=S&&S.modules.some(m=>m.pad===p.i);p.ring.visible=!!type&&!occ&&(type!=='reactor'||p.outer);}
+  }
+  /* ---- input ---- */
+  function bindControls(){
+    let down=null,moved=0;const ptrs=new Map();let pinch=0;
+    cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});down={x:e.clientX,y:e.clientY};moved=0;cam.auto=false;
+      if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch=Math.hypot(a.x-b.x,a.y-b.y)}});
+    cv.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;const pr=ptrs.get(e.pointerId);const dx=e.clientX-pr.x,dy=e.clientY-pr.y;pr.x=e.clientX;pr.y=e.clientY;moved+=Math.abs(dx)+Math.abs(dy);
+      if(ptrs.size===2){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);if(pinch){cam.tr=clamp(cam.tr*pinch/d,22,140)}pinch=d;return}
+      cam.phiT=null;cam.theta-=dx*.006;cam.phi=clamp(cam.phi-dy*.005,.32,1.42)});
+    const up=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=0;if(down&&moved<8&&e.type==='pointerup')click(e);down=null};
+    cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+    cv.addEventListener('wheel',e=>{e.preventDefault();cam.tr=clamp(cam.tr*(1+Math.sign(e.deltaY)*.1),22,140)},{passive:false});
+  }
+  const ray=new THREE.Raycaster();const v2=new THREE.Vector2();
+  function click(e){
+    const rc=cv.getBoundingClientRect();v2.set((e.clientX-rc.left)/rc.width*2-1,-(e.clientY-rc.top)/rc.height*2+1);ray.setFromCamera(v2,camera);
+    if(placing){const hits=ray.intersectObjects(pads.filter(p=>p.ring.visible).map(p=>p.mesh));if(hits.length){UI.place(hits[0].object.userData.pad)}else{
+      const all=ray.intersectObjects(pads.map(p=>p.mesh));if(all.length&&placing==='reactor'&&!pads[all[0].object.userData.pad].outer)toast('The reactor must go on the outer ring, away from the crew.')}return}
+    const hits=ray.intersectObjects([...modMeshes.values(),hab],true);
+    if(hits.length){let o=hits[0].object;while(o&&o.userData.modId==null&&o.userData.mod==null)o=o.parent;if(o)UI.select(o.userData.modId??'hab')}
+  }
+  function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+  /* ---- frame loop ---- */
+  const C_DAY=new THREE.Color(0xd2a676),C_DUSK=new THREE.Color(0x6f8fb4),C_NIGHT=new THREE.Color(0x0d0a14),C_STORM=new THREE.Color(0x8a5a3a),tmp=new THREE.Color();
+  let last=performance.now();
+  function loop(now){
+    const dt=Math.min(.05,(now-last)/1000);last=now;
+    if(anim){const k=clamp((now-anim.t0)/anim.dur,0,1);const e=k<.5?2*k*k:1-((-2*k+2)**2)/2;tod=(anim.from+e)%1;if(k>=1){const cb=anim.cb;anim=null;tod=anim===null?.42:tod;cb&&cb()}}
+    else if(S&&S.phase==='title'){tod=(tod+dt*.004)%1}
+    // sun & sky
+    const a=(tod-.25)*Math.PI*2;const elev=Math.sin(a);
+    const sx=Math.cos(a)*220,sy=elev*200,sz=60;sunL.position.set(sx,Math.max(sy,-30),sz);sunDisc.position.set(sx*1.6,sy*1.6,sz*1.6);sunDisc.visible=elev>-.05;
+    const day=clamp(elev*3+.15,0,1);
+    const storm=S&&S.storm>0&&S.phase!=='title'?1:0;
+    tmp.copy(C_NIGHT).lerp(C_DAY,day);
+    const tw=clamp(1-Math.abs(elev-.04)/.22,0,1);tmp.lerp(C_DUSK,tw*.55);
+    if(storm)tmp.lerp(C_STORM,.7*(.3+day*.7)).multiplyScalar(.85);
+    scene.background=tmp.clone();scene.fog.color.copy(tmp);
+    scene.fog.near=storm?15:70;scene.fog.far=storm?110:230;
+    sunL.intensity=day*(storm?.3:.85);hemi.intensity=.12+day*(storm?.25:.42);
+    stars.material.opacity=(1-day)*(storm?.15:.95);
+    dustPts.visible=!!storm;
+    if(storm){const p=dustPts.geometry.attributes.position;for(let i=0;i<p.count;i++){let x=p.getX(i)+dt*18;if(x>110)x-=220;p.setX(i,x);p.setY(i,(p.getY(i)+dt*(Math.sin(i)*2))%40)}p.needsUpdate=true}
+    if(S)setFrost(S.frost||0);
+    // windows glow at night
+    hab.children[1].material.emissiveIntensity=.15+(1-day)*1.1;
+    // modules
+    const t=now/1000;
+    for(const [id,g] of modMeshes){
+      const m=S&&S.modules.find(x=>x.id===id);if(!m)continue;
+      if(g.userData.grow<1){g.userData.grow=Math.min(1,g.userData.grow+dt*2.2);const s=1-Math.pow(1-g.userData.grow,3);g.scale.setScalar(Math.max(.01,s))}
+      const b=g.userData.beacon;if(b){b.material.color.setHex(m.broken?((t*3|0)%2?0xff3020:0x400000):m.on?0x40ff80:0x555555)}
+      const on=active(m);
+      g.traverse(o=>{if(o.userData.spin&&on)o.rotation.y+=dt*(m.type==='drill'?6:12);if(o.userData.panel){const c=o.material.color;c.setRGB(lerp(.45,.11,S.dust),lerp(.27,.23,S.dust),lerp(.17,.43,S.dust))}
+        if(o.userData.charge){o.material.emissiveIntensity=.2+.8*(S.battery/Math.max(1,S.batCap))}});
+      if(m.type==='greenhouse'){g.userData.growlight.intensity=on&&S.gh.soil>=2?(1-day)*1.6+.3:0;const gr=clamp(S.gh.growth/8,0,1);g.userData.rows.children.forEach(r=>{r.scale.y=.2+gr*1.4;r.position.y=.45+gr*.35})}
+      if(m.type==='rover'){const eva=S.crew.some(c=>c.task==='eva')&&S.phase!=='deploy';
+        if(eva&&anim){const ang=t*.25;g.position.set(Math.cos(ang)*38,H(Math.cos(ang)*38,Math.sin(ang)*38)+.3,Math.sin(ang)*38);g.rotation.y=-ang+Math.PI}
+        else{g.position.copy(g.userData.home);g.rotation.y=g.userData.homeRot}}
+    }
+    // astronauts
+    if(S)astronauts.forEach((as,i)=>{const c=S.crew[i];const out=S.phase==='play'&&TASKS[c.task].out&&(anim||!S.ended);as.visible=!!out;if(!out)return;
+      const tg=as.userData.target;if(as.position.distanceTo(tg)<.6||!as.userData.task||as.userData.task!==c.task){as.userData.task=c.task;
+        let x,z;if(c.task==='berm'){const aa=Math.random()*Math.PI*1.7+.5;x=Math.cos(aa)*7.5;z=Math.sin(aa)*7.5}
+        else if(c.task==='maint'){const sm=S.modules.filter(m=>m.type==='solar'||m.broken);const p=sm.length?padPos(pick(sm).pad):{x:10,z:4};x=p.x+3;z=p.z+1}
+        else{const aa=Math.random()*Math.PI*2,r=26+Math.random()*16;x=Math.cos(aa)*r;z=Math.sin(aa)*r}
+        tg.set(x,0,z)}
+      const sp=(anim?6:1.4)*dt;const d=tg.clone().sub(as.position);d.y=0;const L=d.length();if(L>.01){d.multiplyScalar(Math.min(1,sp/L));as.position.add(d);as.rotation.y=Math.atan2(d.x,d.z)}
+      as.position.y=H(as.position.x,as.position.z);
+      const sw=Math.sin(t*8+i)*.35;as.userData.legs[0].rotation.x=sw;as.userData.legs[1].rotation.x=-sw});
+    // camera
+    if(cam.auto)cam.theta+=dt*.05;
+    cam.r+=(cam.tr-cam.r)*Math.min(1,dt*2);if(cam.phiT!=null){cam.phi+=(cam.phiT-cam.phi)*Math.min(1,dt*2);if(Math.abs(cam.phiT-cam.phi)<.01)cam.phiT=null}
+    camera.position.set(Math.cos(cam.theta)*Math.sin(cam.phi)*cam.r,Math.cos(cam.phi)*cam.r+2,Math.sin(cam.theta)*Math.sin(cam.phi)*cam.r);
+    camera.lookAt(0,2,0);
+    renderer.render(scene,camera);
+    requestAnimationFrame(loop);
+  }
+  function runSol(cb){anim={from:.42,t0:performance.now(),dur:matchMedia('(prefers-reduced-motion: reduce)').matches?300:2800,cb}}
+  function landing(){cam.tr=64;cam.r=170;cam.phi=.5;cam.auto=false;cam.phiT=1.02}
+  function reset(){for(const [,g] of modMeshes)scene.remove(g);modMeshes.clear();roverMesh=null;frostShown=-1;tod=.42;syncShields();cam.auto=true}
+  function setTod(v){tod=v}
+  return {init,syncModules,syncShields,setPlacing,runSol,landing,reset,setTod,get ok(){return !!renderer}};
+})();
+
+/* ---------------- UI ---------------- */
+const modal=$('#modal');
+function show(html,cls=''){modal.className=cls;modal.innerHTML=html;modal.hidden=false;modal.scrollTop=0;const f=modal.querySelector('[data-focus]');if(f)f.focus({preventScroll:true});const c=modal.querySelector('.card');if(c)c.scrollTop=0}
+function hide(){modal.hidden=true;modal.innerHTML=''}
+const TQ=[];let tBusy=false;
+function toast(msg,ms=3600){TQ.push([msg,ms]);if(TQ.length>4)TQ.shift();if(!tBusy)nextToast()}
+function nextToast(){const t=$('#toast');const it=TQ.shift();if(!it){tBusy=false;t.classList.remove('show');return}tBusy=true;t.innerHTML=it[0];t.classList.add('show');setTimeout(nextToast,TQ.length?Math.min(it[1],2800):it[1])}
+function log(msg){S.log.unshift({sol:S.sol,msg});renderLog()}
+
+const UI={
+  tab:'crew',
+  place(pad){const type=S.pending[0];if(!type)return;if(S.modules.some(m=>m.pad===pad))return;
+    S.modules.push({id:S.nextId++,type,pad,on:true,broken:false});S.pending.shift();world.syncModules();
+    if(type==='battery')S.batCap=batCap(),S.battery=S.batCap;
+    world.setPlacing(S.pending[0]||null);renderAll()},
+  select(id){S.sel=id;if(S.phase==='play'){UI.tab='systems';if(innerWidth<=860)mtab('rightp')}renderAll();
+    if(id==='hab')toast('<b>Habitat core.</b> Home for 4 crew: air recycling, water recycling (≈90% recovered), heaters and a small 60 kWh battery.');}
+};
+
+function title(){
+  S=newState('cadet');S.phase='title';world.reset&&world.ok&&world.reset();
+  $('#hud').hidden=true;
+  show(`<div class="card title-hero">
+    <div class="eyebrow">Junior Astronaut Mission Trainer · Mars, northern plains</div>
+    <h1>RED<br><span>FRONTIER</span></h1>
+    <p class="tag">Four astronauts. One outpost. Every choice costs something: mass, money, power, water, or radiation dose. Balance them and the mission survives.</p>
+    <div class="steps"><span><b>1</b>Pack the rocket</span><span><b>2</b>Build the base</span><span><b>3</b>Survive sol by sol</span><span><b>4</b>Read the debrief</span></div>
+    <div class="grid2">
+      ${Object.entries(RANKS).map(([k,r])=>`<button class="rank" data-act="rank" data-arg="${k}" ${k==='cadet'?'data-focus':''}>
+        <span class="meta">${r.N} SOLS · ${r.mass} t · ${r.budget} M$</span><h3>${r.label}</h3><span class="note" style="color:var(--fg)">${r.blurb}</span></button>`).join('')}
+    </div>
+    <div class="title-actions"><button class="ghost" data-act="dataroom">NASA data room</button><button class="ghost" data-act="about">About this project</button></div>
+    <p class="note">Drag to orbit the outpost, scroll or pinch to zoom. Works with mouse, touch and keyboard. Uses real NASA space weather data and photos.</p>
+  </div>`,'clear');
+}
+
+function brief(){
+  show(`<div class="card">
+    <div class="eyebrow">Mission briefing · Rank: ${RANKS[S.rank].label}</div>
+    <h2 style="font-size:30px">Welcome to Vastitas Borealis</h2>
+    <p>Your outpost lands on the icy northern plains of Mars, near where NASA’s Phoenix lander scraped up real water ice in 2008. You must keep four crew alive for <b>${S.N} sols</b> and do as much science as you can before the polar winter arrives.</p>
+    <div class="grid3">
+      <div class="fact"><span class="n">24 h 37 min</span><span class="d">One Mars day, called a <b>sol</b>. Each turn in this game is one sol.</span></div>
+      <div class="fact"><span class="n">38% gravity</span><span class="d">About a third of Earth’s. Lighter loads, but bones and muscles weaken.</span></div>
+      <div class="fact"><span class="n">95% CO₂, &lt;1% pressure</span><span class="d">The air is thin and unbreathable. Oxygen must be shipped or made.</span></div>
+      <div class="fact"><span class="n">−20 °C to −100 °C</span><span class="d">Daytime is freezing and nights are far colder. Heating costs power.</span></div>
+      <div class="fact"><span class="n">No magnetic shield</span><span class="d">Cosmic rays and solar storms reach the surface. Your dose limit: <b>${S.doseLimit} mSv</b> per astronaut for this mission.</span></div>
+      <div class="fact"><span class="n">Toxic soil</span><span class="d">Regolith is crushed volcanic rock with perchlorate salts. Wash it before growing food.</span></div>
+    </div>
+    <div class="grid2">${photo('PIA10906')}${photo('PIA12338')}</div>
+    <div class="didyou"><b>The engineer’s problem:</b> you cannot max out everything. A heavier, stronger part means less room for food. Cheaper parts can fail. Faster work means more radiation. That is an <b>engineering trade-off</b>, and every real mission is built from them.</div>
+    <div class="row"><button class="cta" data-act="manifest" data-focus>Pack the rocket →</button><button class="ghost" data-act="title">Back</button></div>
+  </div>`);
+}
+
+/* ---- Manifest ---- */
+function mStats(M=S.manifest){let mass=0,cost=0,pads=0;for(const k of ORDER){const n=M[k]||0;mass+=n*DEF[k].mass;cost+=n*DEF[k].cost;if(DEF[k].pad)pads+=n}return {mass,cost,pads}}
+function preflight(){
+  const M=S.manifest,n=k=>M[k]||0,N=S.N;
+  const o2=10+60*n('o2tank'),water=40+800*n('watertank'),food=12+110*n('food');
+  const o2p=2.4*n('moxie')+4.4*n('electro')+(n('greenhouse')?.8:0);
+  const wp=45*n('drill')-5*n('electro')-12*n('greenhouse');
+  const fp=n('greenhouse')?3:0;
+  const load0=40+35*n('drill')+40*n('moxie')+30*n('electro')+50*n('greenhouse');
+  const loadE=load0+48;
+  const gen0=45*n('solar')+240*n('reactor'),genE=45*.55*.85*n('solar')+240*n('reactor');
+  const cap=60+150*n('battery'),night=Math.max(0,load0/2-120*n('reactor'));
+  const life=(stock,use,prod,grace=0)=>prod>=use?Infinity:(stock+prod*grace)/(use-prod);
+  const o2L=life(o2-20,3.36,o2p*.85),wL=life(water,10,wp>0?wp*.85:wp),fL=fp?(food+Math.max(0,N-10)*fp)/4:food/4;
+  const dose=N*.45*(n('poly')?.7:1)+2*S.speDose*(n('poly')?.7:1);
+  const ck=(ok,warn)=>ok?'good':warn?'warn':'bad';
+  const life2=v=>v===Infinity?'self-sufficient':`${Math.floor(v)} sols`;
+  const out=[];
+  out.push({s:ck(o2L>=N+3,o2L>=N*.9),t:`<b>Oxygen</b> lasts ≈${life2(o2L)} of ${N}, allowing for one leak and storm downtime.`+(o2L<N?' The crew cannot survive without air: add tanks or an oxygen maker.':'')});
+  out.push({s:ck(wL>=N,wL>=N*.7),t:`<b>Water</b> lasts ${life2(wL)}.`+(n('electro')&&!n('drill')?' The water splitter drinks your water.':'')});
+  out.push({s:ck(fL>=N,fL>=N*.75),t:`<b>Food</b> lasts about ${Math.floor(fL)} sols.`+(n('greenhouse')?' (Includes harvests once soil is washed and crops grow.)':'')});
+  out.push({s:ck(gen0>=load0,gen0>=load0*.85),t:`<b>Power at landing:</b> ${fmt(gen0)} kWh made vs ${fmt(load0)} kWh needed per sol.`});
+  out.push({s:ck(genE>=loadE,genE>=loadE*.75),t:`<b>Power by winter:</b> ≈${fmt(genE)} vs ≈${fmt(loadE)} kWh. Less sun, more heating.`+(genE<loadE?' You will need to switch machines off.':'')});
+  out.push({s:ck(cap>=night||n('reactor'),cap>=night*.7),t:`<b>Night storage:</b> ${cap} kWh battery vs ≈${fmt(night)} kWh needed after sunset.`});
+  out.push({s:ck(dose<S.doseLimit*.7,dose<S.doseLimit),t:`<b>Radiation</b> estimate ≈${fmt(dose)} mSv per person (limit ${S.doseLimit}), before any outdoor work. ${n('poly')?'':'Plan to build a regolith berm (8 crew-sols) or a water wall.'}`});
+  out.push({s:n('rover')?'good':'warn',t:n('rover')?'<b>Science:</b> rover packed for expeditions.':'<b>Science:</b> no rover. Science on foot is slower.'});
+  return out;
+}
+function manifest(){
+  S.phase='manifest';
+  const st=mStats();const over={mass:st.mass>S.massCap+1e-9,cost:st.cost>S.budget,pads:st.pads>12};
+  const canLaunch=!over.mass&&!over.cost&&!over.pads;
+  const pf=preflight();const bad=pf.filter(p=>p.s==='bad').length;
+  const meter=(lbl,v,max,unit,ov)=>`<div class="meter ${ov?'over':''}"><div class="row" style="justify-content:space-between"><span class="lbl">${lbl}</span><span class="mono">${fmt(v,unit==='t'?1:0)} / ${max} ${unit}</span></div><div class="bar"><i style="width:${clamp(v/max*100,0,100)}%"></i></div></div>`;
+  const prioEdit=S.rank==='commander';
+  show(`<div class="card" style="max-width:1100px">
+    <div class="row" style="justify-content:space-between"><div><div class="eyebrow">Step 1 · Cargo manifest</div><h2 style="font-size:28px">Pack the rocket</h2></div>
+      ${S.rank==='cadet'?'<button class="ghost" data-act="starter">Load the starter plan</button>':''}</div>
+    <p class="note" style="color:var(--fg)">Every kilogram launched from Earth costs fuel, and the budget is fixed. This is the <b>iron triangle</b> of engineering: <b>mass, cost, and what the mission can do</b>. You cannot have all three maxed out.</p>
+    <div class="meters">${meter('Launch mass',st.mass,S.massCap,'t',over.mass)}${meter('Budget',st.cost,S.budget,'M$',over.cost)}${meter('Landing pads',st.pads,12,'',over.pads)}</div>
+    <div class="items">${ORDER.map(k=>{const d=DEF[k],c=S.manifest[k]||0;const nextOk=c<d.max;return `<div class="item ${c?'has':''}">
+      <div class="top"><span class="nm">${d.name}</span><span class="mc">${d.mass} t · ${d.cost} M$</span></div>
+      ${ITEM_IMG[k]?`<img class="thumb" src="${imgUrl(ITEM_IMG[k])}" alt="${esc(NIMG[ITEM_IMG[k]][0])}" loading="lazy" onerror="this.remove()">`:''}<span class="st">${d.stat}</span><span class="tr">${d.trade}</span>
+      <div class="step"><button data-act="dec" data-arg="${k}" ${c?'':'disabled'} aria-label="Remove one ${d.name}">−</button><span class="c">${c}</span><button data-act="inc" data-arg="${k}" ${nextOk?'':'disabled'} aria-label="Add one ${d.name}">+</button><span class="note">max ${d.max}${d.pad?' · needs a pad':''}</span></div></div>`}).join('')}</div>
+    <div class="grid2" style="align-items:start">
+      <div class="sec"><span class="lbl">Pre-flight check · mission control’s estimate</span><div class="checks">${pf.map(p=>`<div class="check"><span class="ic ${p.s}">${p.s==='good'?'✓':p.s==='warn'?'!':'×'}</span><span>${p.t}</span></div>`).join('')}</div></div>
+      <div class="sec"><span class="lbl">Mission priorities · a weighted list of requirements</span>
+        <p class="note">Your final score weighs each result by these numbers. ${prioEdit?'Set what matters most to you.':'Commanders can change them. Cadets use mission control’s weights.'}</p>
+        ${PRIOS.map(([k,l])=>`<label class="prio"><span>${l}</span><input type="range" id="prio-${k}" min="0" max="5" step="1" value="${S.weights[k]}" data-prio="${k}" ${prioEdit?'':'disabled'}><span class="mono">${S.weights[k]}</span></label>`).join('')}
+      </div>
+    </div>
+    <div class="row"><button class="cta" data-act="launch" ${canLaunch?'':'disabled'}>Launch to Mars →</button>
+      <span class="note">${!canLaunch?(over.mass?'Too heavy: remove some cargo. ':'')+(over.cost?'Over budget. ':'')+(over.pads?'Not enough landing pads. ':''):bad?`<span style="color:var(--warn)">Mission control sees ${bad} serious problem${bad>1?'s':''}. You can still launch, and learn the hard way.</span>`:'Looks flyable. Good luck, crew.'}</span></div>
+  </div>`);
+}
+const ITEM_IMG={moxie:'PIA24203',greenhouse:'VEGGIE',drill:'PIA10906',poly:'PIA16938'};
+const STARTER={solar:4,battery:2,drill:1,o2tank:2,food:2,spares:1,rover:1};
+
+function launch(){
+  const st=mStats();S.spent=st.cost;S.massUsed=st.mass;
+  const M=S.manifest,n=k=>M[k]||0;
+  S.o2=10+60*n('o2tank');S.water=40+800*n('watertank');S.food=12+110*n('food');S.spares=n('spares');S.poly=!!n('poly');
+  S.pending=[];for(const k of ORDER)if(DEF[k].pad)for(let i=0;i<n(k);i++)S.pending.push(k);
+  S.pending.sort((a,b)=>(b==='reactor')-(a==='reactor'));
+  S.modules=[];S.phase='deploy';hide();
+  world.landing();world.syncModules();world.setPlacing(S.pending[0]||null);
+  $('#hud').hidden=false;UI.tab='build';mtab('rightp');
+  log('Touchdown on Vastitas Borealis. Unloading cargo.');SFX.whoosh();
+  ['iron','weights','weight'].forEach(b=>S.badges.includes(b)||S.badges.push(b));toast('<span class="lbl" style="color:var(--rust)">3 trade-offs discovered</span><br>Packing the rocket taught you the <b>iron triangle</b>, <b>weighted requirements</b> and <b>weight vs strength</b>.',5200);
+  if(S.pending.length)toast('Tap a glowing landing pad to place each module. The reactor only fits on the outer ring.',5000);
+  renderAll();
+}
+function autoPlace(){while(S.pending.length){const t=S.pending[0];const free=[...Array(12).keys()].filter(i=>!S.modules.some(m=>m.pad===i)&&(t!=='reactor'||i>=6));
+  const pref=t==='reactor'?free:t==='solar'||t==='battery'?free.sort((a,b)=>a-b):free;if(!pref.length)break;UI.place(pref[0])}}
+function beginMission(){
+  S.phase='play';S.batCap=batCap();S.battery=S.batCap;world.setPlacing(null);UI.tab='crew';
+  log(`Sol 1. A sol lasts 24 h 37 min. Assign each astronaut a task, then press End Sol.`);
+  if(S.rank==='cadet')toast('Tip: a solar storm is likely in the first week or so. Two astronauts on <b>Build berm</b> for 4 sols makes a free radiation shield.',7000);
+  renderAll();
+}
+
+/* ---- Sol loop ---- */
+let busy=false;
+function endSol(){
+  if(busy||S.phase!=='play')return;busy=true;SFX.sol();
+  if(S.crew.some(c=>TASKS[c.task].out))setTimeout(()=>award('safety'),3200);
+  const solNow=S.sol;
+  renderAll();
+  world.runSol(()=>{
+    const r=simulateSol();
+    r.notes.forEach(n=>log(n));
+    if(r.deficit>0&&!r.notes.some(n=>n.startsWith('Blackout')))log(`Power ran short by ${fmt(r.deficit)} kWh: machines slowed to ${fmt(r.f*100)}%.`);
+    if(S.failed){busy=false;renderAll();debrief();return}
+    const tip=TIPS[(solNow-1)%TIPS.length];
+    S.sol++;
+    if(S.sol>S.N){busy=false;S.ended=true;renderAll();debrief();return}
+    const sumUp=`Sol ${solNow} done · O₂ ${sgn(r.delta.o2,1)} kg · water ${sgn(r.delta.water)} L · food ${sgn(r.delta.food,1)} · battery ${fmt(S.battery)}/${S.batCap} kWh${r.sci?` · science +${fmt(r.sci)}`:''}`;
+    toast(sumUp,4200);
+    const ev=chooseEvent();
+    busy=false;renderAll();
+    if(ev){S.lastEvent=S.sol;showEvent(ev)}else if(S.sol%3===0&&askQuiz()){}else if(tip&&Math.random()<.5)log(tip);
+  });
+}
+function showEvent(ev){
+  if(ev.pre)ev.pre();
+  S.curEvent=ev;renderAll();
+  if(ev.kind==='bad'){SFX.alarm();shake(ev.key&&ev.key.startsWith('spe')?'spe':'bad')}else SFX.good();
+  SPEAK_TEXT=ev.title+'. '+ev.text+' Your options: '+ev.opts.map(o=>o.l+'. '+o.d).join(' Or: ');
+  const im=EV_IMG[ev.key],tr=BADGES.find(b=>b[0]===EV_TRADE[ev.key]);
+  show(`<div class="card narrow" role="dialog" aria-labelledby="evt">
+    <div class="eyebrow" style="color:${ev.kind==='good'?'var(--good)':ev.kind==='bad'?'var(--bad)':'var(--sky)'}">Sol ${S.sol} · ${ev.kind==='good'?'Good news':ev.kind==='bad'?'Engineering decision':'Mission update'}</div>
+    <div class="row" style="justify-content:space-between">${tr?`<span class="tradechip">Trade-off · ${tr[1]}</span>`:'<span></span>'}${canSpeak()?'<button class="sbtn" data-act="speak">Read aloud</button>':''}</div>
+    <h2 id="evt" style="font-size:26px">${ev.title}</h2>
+    <p>${ev.text}</p>
+    <div class="opts">${ev.opts.map((o,i)=>`<button class="opt" data-act="evopt" data-arg="${i}" ${o.dis?'disabled':''} ${i===0?'data-focus':''}>
+      <span class="l">${o.l}</span><span class="note" style="color:var(--fg)">${o.d}${o.dis?' <i>(no spare parts left)</i>':''}</span>
+      <span class="tags">${o.tags.map(t=>`<span class="tag ${t[0]==='+'?'p':'m'}">${t}</span>`).join('')}</span></button>`).join('')}</div>
+    <div class="didyou"><b>Real Mars:</b> ${ev.fact}</div>
+    ${im?photo(im,'wide'):''}
+  </div>`);
+}
+function chooseOpt(i){const ev=S.curEvent;if(!ev)return;const o=ev.opts[i];if(o.dis)return;o.go();
+  if(o.lesson)S.choices.push({sol:S.sol,title:ev.title,pick:o.l,lesson:o.lesson});
+  log(`${ev.title}: ${o.l}.`);S.curEvent=null;if(EV_TRADE[ev.key])award(EV_TRADE[ev.key]);hide();world.syncModules();renderAll()}
+
+const TIPS=[
+  'Fact: Mars gravity is 3.71 m/s², about 38% of Earth’s. A 30 kg backpack feels like 11 kg.',
+  'Fact: The habitat recycles about 90% of its water. Without recycling each astronaut would need around 25 L a day.',
+  'Fact: Curiosity’s radiation detector measured about 0.67 mSv per sol on the surface of Mars.',
+  'Fact: Mars seasons work like Earth’s because its axis is tilted by 25°, but each season lasts about twice as long.',
+  'Fact: Dust on solar panels can cut their output by a few percent every few sols. Someone has to clean them.',
+  'Fact: Ice was found just centimetres under the soil at the Phoenix landing site. Deeper drilling reaches thicker ice.',
+  'Fact: Sunsets on Mars look blue. Fine dust scatters blue light forward, toward the setting Sun.',
+  'Fact: Regolith is not real soil: it has no living material. Adding microbes and compost could turn it into soil over time.',
+  'Fact: A nuclear fission power unit for the Moon or Mars aims to supply about 10 kW, day and night, for 10 years.',
+];
+
+/* ---------------- Render HUD ---------------- */
+function renderAll(){if(!S||S.phase==='title')return;renderTop();renderLeft();renderRight();renderLog();renderEnd()}
+function renderTop(){
+  $('#solnum').textContent=Math.min(S.sol,S.N);$('#solof').textContent='/ '+S.N;
+  const w=$('#weather');
+  if(S.storm>0){w.className='chip bad';w.innerHTML=`<span class="dot"></span>Dust storm · ${S.storm} sol${S.storm>1?'s':''} left`}
+  else if(S.winter){w.className='chip warn';w.innerHTML='<span class="dot"></span>Polar winter · CO₂ frost'}
+  else{w.className='chip good';w.innerHTML='<span class="dot"></span>Clear sky'}
+  $('#sunchip').innerHTML=`<span class="mono">Sun ${Math.round(sunFactor()*100)}%</span>`;
+  $('#seasonpin').style.left=`calc(${clamp((S.sol-1)/S.N,0,1)*100}% - 1px)`;
+  $('#mathbtn').setAttribute('aria-pressed',S.math);
+}
+function vital(name,val,frac,color,sub,dl){return `<div class="vital"><span class="name">${name}</span><span class="val">${val}</span><div class="bar"><i style="width:${clamp(frac,0,1)*100}%;background:${color}"></i></div><div class="sub"><span>${sub}</span><span class="${dl==null?'flat':dl>=0?'up':'down'}">${dl==null?'':dl}</span></div></div>`}
+function renderLeft(){
+  const el=$('#leftp');const L=S.last;const P=powerPlan();
+  const dd=k=>L?L.delta[k]:null;
+  const days=(stock,k)=>{if(!L)return '';const d=L.delta[k];return d>=-0.01?'stable or growing':`≈${Math.floor(stock/-d)} sols at this rate`};
+  const maxDose=Math.max(...S.crew.map(c=>c.dose));
+  const objs=[
+    {t:`Keep all 4 crew alive to sol ${S.N}`,d:S.ended&&!S.failed,f:!!S.failed},
+    {t:`Science: ${fmt(S.science)} / ${S.sciGoal}`,d:S.science>=S.sciGoal},
+    {t:`Find water: make 100 L on Mars (${fmt(S.made.water)})`,d:S.made.water>=100},
+    {t:'Harvest food grown in Martian regolith',d:S.made.food>0},
+    {t:`Everyone under ${S.doseLimit} mSv`,d:S.ended&&!S.failed&&maxDose<S.doseLimit,f:maxDose>=S.doseLimit},
+  ];
+  const short=Math.max(0,P.nightNeed-S.battery);
+  const fc=S.phase!=='play'?'':P.net<0||short>0?
+    `<div class="forecast" style="border-color:var(--warn)"><b style="color:var(--warn)">Power forecast:</b> ${P.net<0?`${fmt(-P.net)} kWh short next sol.`:''} ${short>0&&P.net>=0?'Batteries may not last the night.':''} Switch something off in Systems, clean panels, or accept slower machines.${S.dust<.75&&P.sN?` <b>Panels are only ${Math.round(S.dust*100)}% clean.</b>`:''}</div>`:
+    `<div class="forecast"><b style="color:var(--good)">Power forecast:</b> +${fmt(P.net)} kWh spare next sol.</div>`;
+  const alerts=[];if(L){[['o2','Oxygen',S.o2],['water','Water',S.water],['food','Food',S.food]].forEach(([k,n,v])=>{const d=L.delta[k];if(d<-0.01&&v/-d<6)alerts.push(`<b>${n} runs out in about ${Math.max(0,Math.floor(v/-d))} sols.</b>`)})}
+  const al=alerts.length&&S.phase==='play'?`<div class="forecast" style="border-color:var(--bad);color:var(--bad)">${alerts.join(' ')} Make more, use less, or switch a machine back on.</div>`:'';
+  el.innerHTML=`<div class="sec"><span class="lbl">Life support</span>${al}
+    ${vital('Oxygen',fmt(S.o2,1)+' kg',S.o2/150,'var(--good)',days(S.o2,'o2'),dd('o2')==null?null:sgn(dd('o2'),1))}
+    ${vital('Water',fmt(S.water)+' L',S.water/900,'var(--ice)',days(S.water,'water'),dd('water')==null?null:sgn(dd('water')))}
+    ${vital('Food',fmt(S.food)+' meals',S.food/240,'var(--sky)',days(S.food,'food'),dd('food')==null?null:sgn(dd('food'),1))}
+    ${vital('Battery',fmt(S.battery)+' / '+S.batCap+' kWh',S.battery/Math.max(1,S.batCap),'var(--warn)',`load ≈${fmt(P.load)} kWh/sol`,dd('battery')==null?null:sgn(dd('battery')))}
+    ${vital('Highest dose',fmt(maxDose,1)+' / '+S.doseLimit+' mSv',maxDose/S.doseLimit,maxDose>S.doseLimit*.75?'var(--bad)':'#d48cf0',`shield lets ${Math.round(shieldMult()*100)}% through`,null)}
+    ${vital('Crew health',fmt(S.health)+'%',S.health/100,S.health<40?'var(--bad)':'var(--good)','',dd('health')==null?null:sgn(dd('health')))}
+    ${vital('Morale',fmt(S.morale)+'%',S.morale/100,S.morale<30?'var(--bad)':'var(--sky)',S.morale<30?'Low morale: slower science':'',dd('morale')==null?null:sgn(dd('morale'),1))}
+  </div>
+  ${fc?`<div class="sec">${fc}</div>`:''}
+  ${S.math&&S.phase==='play'?`<div class="sec"><span class="lbl">The math · next sol</span><div class="math">
+    <span><b>Power</b> ${P.sN} solar × 45 × ${fmt(P.sun*100)}% sun × ${fmt(S.dust*100)}% clean = ${fmt(P.solar)}</span>
+    <span>+ reactor ${fmt(P.reactor)} − hab 40 − heat ${fmt(P.heat)} ${P.modLines.map(([n,u])=>`− ${n} ${u}`).join(' ')}</span>
+    <span>= <b>${sgn(P.net)} kWh</b> · after sunset needs ${fmt(P.nightNeed)} kWh from battery</span>
+    <span><b>Crew use</b> 4 × (0.84 kg O₂ + 2.5 L water + 1 meal)</span>
+    ${L?`<span style="margin-top:6px"><b>Last sol</b></span>${L.lines.map(x=>`<span>${x}</span>`).join('')}`:''}
+    <span style="margin-top:6px;opacity:.8">Numbers are simplified for play but use real Mars ratios.</span></div></div>`:''}
+  <div class="sec"><span class="lbl">Trade-offs discovered · ${S.badges.length}/${BADGES.length}</span><div class="badges">${BADGES.map(b=>`<span class="bdg ${S.badges.includes(b[0])?'on':''}" title="${esc(b[2])}">${b[1]}</span>`).join('')}</div>
+    ${S.quiz.total?`<span class="note">Quiz: ${S.quiz.right} of ${S.quiz.total} correct</span>`:''}</div>
+  <div class="sec"><span class="lbl">Mission objectives</span>${objs.map(o=>`<div class="obj ${o.d?'done':o.f?'fail':''}"><span class="box">${o.d?'✓':o.f?'×':''}</span><span>${o.t}</span></div>`).join('')}</div>`;
+}
+function renderRight(){
+  const el=$('#rightp');
+  if(S.phase==='deploy'){
+    const counts={};S.pending.forEach(t=>counts[t]=(counts[t]||0)+1);
+    el.innerHTML=`<div class="sec"><span class="lbl">Step 2 · Build the base</span>
+      <p style="margin:0">${S.pending.length?`Place your <b>${DEF[S.pending[0]].name}</b>: tap a glowing pad in the 3D view.${S.pending[0]==='reactor'?' Reactors go on the outer ring, far from the crew, because they give off radiation.':''}`:'All modules are placed. Time to start the mission.'}</p>
+      ${Object.entries(counts).map(([t,c],i)=>`<div class="bcard" aria-pressed="${i===0}"><span><b>${DEF[t].name}</b><br><span class="note">${DEF[t].stat}</span></span><span class="mono">×${c}</span></div>`).join('')}
+      <div class="row">${S.pending.length?'<button class="sbtn" data-act="autoplace">Place everything for me</button>':''}</div>
+      <p class="note">Habitat core is already at the centre. Inner pads are close to the crew; outer pads are 22 m away.</p></div>`;
+    $('#placehint').hidden=!S.pending.length;$('#placehint').textContent=S.pending.length?`Place: ${DEF[S.pending[0]].name} (${S.pending.length} left)`:'';
+    return;
+  }
+  $('#placehint').hidden=true;
+  const tab=UI.tab==='build'?'crew':UI.tab;
+  const tabs=`<div class="rtabs" role="tablist"><button role="tab" data-act="rtab" data-arg="crew" aria-selected="${tab==='crew'}">Crew</button><button role="tab" data-act="rtab" data-arg="systems" aria-selected="${tab==='systems'}">Systems</button></div>`;
+  if(tab==='crew'){
+    const outs=S.crew.filter(c=>TASKS[c.task].out).length;
+    el.innerHTML=tabs+`<div class="sec"><span class="lbl">Assign today’s work</span>
+      ${S.speToday?'<div class="warnline"><b>Solar storm today.</b> Anyone outside takes a big dose.</div>':''}${S.savedTasks?'<div class="note">Today only: jobs return to normal after this sol.</div>':''}
+      ${S.crew.map((c,i)=>`<div class="crew"><div class="hd"><span class="av" style="background:${c.color}">${c.name.split(' ').map(x=>x[0]).join('')}</span>
+        <span><div class="nm">${c.name}</div><div class="rl">${c.role} · ${c.perk}</div></span>
+        <span class="dose">${fmt(c.dose,1)} mSv<br><span style="color:${c.dose>S.doseLimit*.75?'var(--bad)':'var(--muted)'}">${Math.round(c.dose/S.doseLimit*100)}% of limit</span></span></div>
+        <div class="tasks" role="group" aria-label="Task for ${c.name}">${Object.entries(TASKS).map(([k,t])=>`<button class="${t.out?'out':''}" data-act="task" data-arg="${i}:${k}" aria-pressed="${c.task===k}" title="${esc(t.desc)}">${t.label}</button>`).join('')}</div></div>`).join('')}
+      <p class="note">Dashed buttons are outdoor work: more progress, more radiation. ${outs?`<b style="color:var(--warn)">${outs} outside today.</b>`:'Everyone is inside today.'}</p>
+      ${S.berm<8?`<div><div class="row" style="justify-content:space-between"><span class="note">Regolith berm</span><span class="mono note">${S.berm}/8 crew-sols</span></div><div class="prog"><i style="width:${S.berm/8*100}%;background:var(--rust)"></i></div></div>`:''}
+    </div>`;
+  }else{
+    const P=powerPlan();const rover=S.modules.find(m=>m.type==='rover');
+    const st=m=>{if(m.broken)return '<span class="chip bad">Broken</span>';if(!m.on)return '<span class="chip">Off</span>';
+      if(m.type==='greenhouse'){if(S.gh.soil<2)return `<span class="chip warn">Soil needs washing ${fmt(S.gh.soil,1)}/2</span>`;if(S.gh.growth<8)return `<span class="chip good">Growing ${fmt(S.gh.growth,1)}/8</span>`;return '<span class="chip good">Harvesting</span>'}
+      if(m.type==='electro'&&S.water<5)return '<span class="chip warn">No water</span>';return '<span class="chip good">Running</span>'};
+    const info=m=>{const u=moduleUse(m);if(m.type==='solar')return `+${fmt(45*sunFactor()*S.dust)} kWh`;if(m.type==='reactor')return m.broken?'0 kWh':'+240 kWh';if(m.type==='battery')return '150 kWh store';return u?`−${u} kWh`:''};
+    el.innerHTML=tabs+`<div class="sec"><span class="lbl">Power grid</span>
+      <div class="note" style="color:var(--fg)">Making <b>${fmt(P.solar+P.reactor)}</b> kWh · using <b>${fmt(P.load)}</b> kWh · <span class="${P.net>=0?'up':'down'}">${sgn(P.net)} kWh</span></div>
+      <div class="note">Solar panels ${fmt(S.dust*100)}% clean. Assign <b>Maintain</b> to clean them.</div></div>
+      <div class="sec"><span class="lbl">Modules · tap one in 3D to find it</span>
+      ${S.modules.map(m=>`<div class="sys ${S.sel===m.id?'sel':''}"><span class="t">${DEF[m.type].name}</span>
+        <span>${['solar','reactor','battery','rover'].includes(m.type)&&m.type!=='solar'&&m.type!=='reactor'?'':`<button class="sbtn ${m.on?'on':''}" data-act="toggle" data-arg="${m.id}" aria-pressed="${m.on}">${m.on?'On':'Off'}</button>`}</span>
+        <span class="s">${st(m)}<span class="mono">${info(m)}</span>${m.broken&&S.spares>0?`<button class="sbtn primary" data-act="repair" data-arg="${m.id}">Repair (1 spare)</button>`:''}</span></div>`).join('')||'<p class="note">No modules.</p>'}
+      ${S.oven?'<div class="sys"><span class="t">Sulfate oven</span><span></span><span class="s"><span class="chip good">Running</span><span class="mono">−25 kWh · +15 L</span></span></div>':''}
+      <p class="note">Spare parts: <b>${S.spares}</b></p></div>
+      <div class="sec"><span class="lbl">Radiation shielding · ${Math.round(shieldMult()*100)}% gets through</span>
+        <div><div class="row" style="justify-content:space-between"><span>Regolith berm</span><span class="mono note">${S.berm}/8 · −${Math.round(45*S.berm/8)}%</span></div><div class="prog"><i style="width:${S.berm/8*100}%;background:var(--rust)"></i></div></div>
+        <div class="row" style="justify-content:space-between"><span>Water wall ${S.waterWall?'<span class="chip good">Full · −35%</span>':''}</span>
+          ${S.waterWall?'<button class="sbtn" data-act="drain">Drain 400 L back</button>':`<button class="sbtn" data-act="fill" ${S.water>=400?'':'disabled'}>Fill (400 L)</button>`}</div>
+        <div class="row" style="justify-content:space-between"><span>Polyethylene panels</span><span class="note">${S.poly?'<span class="chip good">Installed · −30%</span>':'Not packed'}</span></div></div>
+      ${rover?`<div class="sec"><span class="lbl">Rover expedition · 2D drive</span>
+        <p class="note">Two crew drive out to collect samples. Uses 30 kWh from the battery and adds radiation dose. ${S.roverCool?`Rover recharging: ${S.roverCool} sol${S.roverCool>1?'s':''}.`:''}</p>
+        <button class="sbtn primary" data-act="expedition" ${S.roverCool||S.storm>0||!active(rover)||S.battery<30?'disabled':''}>Launch expedition</button>
+        ${S.storm>0?'<span class="note">Too dusty to drive.</span>':S.battery<30?'<span class="note">Battery below 30 kWh.</span>':''}</div>`:''}`;
+  }
+}
+function renderLog(){const el=$('#logbox');if(!S)return;el.innerHTML=S.log.slice(0,4).map(l=>`<div class="row"><span class="sol">SOL ${l.sol}</span>${esc(l.msg)}</div>`).join('')||'<div class="row">Mission log</div>'}
+function renderEnd(){const b=$('#endbtn');
+  if(S.phase==='deploy'){b.disabled=!!S.pending.length;b.querySelector('span').textContent='START SOL 1';$('#endsub').textContent=S.pending.length?`${S.pending.length} module${S.pending.length>1?'s':''} to place`:'Begin the mission';return}
+  b.disabled=busy||S.phase!=='play';b.querySelector('span').textContent=busy?'SOL RUNNING…':'END SOL '+S.sol;$('#endsub').textContent='Run 24 h 37 min';}
+function mtab(id){['leftp','rightp','logbox'].forEach(x=>$('#'+x).classList.toggle('active',x===id));
+  document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.arg===id))}
+
+/* ---------------- 2D Rover expedition ---------------- */
+function expedition(){
+  const SAMPLES=[
+    ['ice','Water ice','The Phoenix lander saw bright chunks of ice vanish over 4 sols as they turned straight into vapour.','#bfe9ff'],
+    ['sulfate','Sulfate crystal','Sulfate minerals hold water inside their crystals. Heat them and the water comes out.','#f4f1e6'],
+    ['basalt','Volcanic basalt','Most Martian rock is volcanic. The main source of rocks here is ancient eruptions.','#3a3a46'],
+    ['perc','Perchlorate salt','Toxic to people, but some microbes on Earth can use perchlorate as food.','#f5d34f'],
+    ['dust','Ultrafine dust','Martian dust is finer than flour and sticks to everything, including solar panels.','#d98c55'],
+  ];
+  const LEN=700;const g0=x=>4*Math.sin(x*.021)+2.2*Math.sin(x*.057+1)+.9*Math.sin(x*.14+2);
+  const rocks=[];for(let x=40;x<LEN-20;x+=26+Math.random()*30)rocks.push({x,w:1.6+Math.random()*1.8,h:.7+Math.random()*.9});
+  const bump=x=>{let h=0;for(const r of rocks){const d=(x-r.x)/r.w;if(Math.abs(d)<1)h+=r.h*Math.cos(d*Math.PI/2)**2}return h};
+  const G=x=>g0(x)+bump(x);const slope=x=>(G(x+.05)-G(x-.05))/.1;
+  const samples=[];for(let i=0;i<6;i++){const s=SAMPLES[i%SAMPLES.length];let x=70+i*105+Math.random()*30;samples.push({x,type:s,got:false})}
+  const st={x:4,vx:0,y:G(4),vy:0,ground:true,hp:3,bat:100,dose:0,t:0,drill:0,got:[],grav:3.71,done:false,keys:{},msg:'',hitCd:0};
+  show(`<div class="card" style="max-width:960px">
+    <div class="row" style="justify-content:space-between"><div><div class="eyebrow">Rover expedition · 2D</div><h2 style="font-size:24px">Drive, stop, drill</h2></div>
+      <div class="row"><span class="lbl">Gravity</span><button class="sbtn on" id="gm" data-act="grav" data-arg="3.71">Mars 3.71</button><button class="sbtn" id="ge" data-act="grav" data-arg="9.81">Earth 9.81</button></div></div>
+    <p class="note" style="color:var(--fg)">Reach the beacon 700 m away. <b>Stop</b> next to a glowing sample and <b>drill</b> it. Driving fast burns battery and launches you off rocks: in low gravity you fly far and land hard. Speed versus safety, your call.</p>
+    <div class="xhud"><span><span class="k">Battery</span> <span class="xbar"><i id="xb"></i></span></span><span><span class="k">Hull</span> <span id="xh" class="mono"></span></span>
+      <span><span class="k">Speed</span> <span id="xs" class="mono"></span></span><span><span class="k">Distance</span> <span id="xd" class="mono"></span></span><span><span class="k">Dose</span> <span id="xr" class="mono"></span></span><span><span class="k">Samples</span> <span id="xn" class="mono"></span></span></div>
+    <div id="xwrap"><canvas id="xcv" width="320" height="170" tabindex="0" aria-label="Rover driving game. Use arrow keys to drive and Space to drill."></canvas><div id="xtoast"></div></div>
+    <div class="pad-btns"><button data-k="left" aria-label="Brake or reverse">◀ Brake</button><button data-k="drill" aria-label="Drill">Drill</button><button data-k="right" aria-label="Drive forward">Drive ▶</button></div>
+    <p class="note">Keyboard: ← brake, → drive, Space drill. Real rovers creep at under 0.2 km/h; this one is sped up so you can finish before lunch.</p>
+    <div class="row"><button class="ghost" data-act="xend">End expedition and return</button></div>
+  </div>`);
+  const cv=$('#xcv'),ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=false;cv.focus();
+  const W=320,Hh=170,PX=W/48;
+  const kd=e=>{if(['ArrowLeft','ArrowRight',' ','Space','ArrowUp','ArrowDown'].includes(e.key)||e.code==='Space'){e.preventDefault()}
+    if(e.key==='ArrowRight')st.keys.right=e.type==='keydown';if(e.key==='ArrowLeft')st.keys.left=e.type==='keydown';if(e.code==='Space')st.keys.drill=e.type==='keydown'};
+  addEventListener('keydown',kd);addEventListener('keyup',kd);
+  modal.querySelectorAll('[data-k]').forEach(b=>{const k=b.dataset.k;const on=e=>{e.preventDefault();st.keys[k]=true;b.classList.add('active')};const off=()=>{st.keys[k]=false;b.classList.remove('active')};
+    b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointerleave',off);b.addEventListener('pointercancel',off)});
+  let xt;const say=(m,ms=3500)=>{const t=$('#xtoast');if(!t)return;t.innerHTML=m;t.classList.add('show');clearTimeout(xt);xt=setTimeout(()=>t&&t.classList.remove('show'),ms)};
+  say('Hold <b>Drive ▶</b> to roll out. Stop near a glowing marker to drill.');
+  EXP.setGrav=v=>{st.grav=v;$('#gm').classList.toggle('on',v<5);$('#ge').classList.toggle('on',v>5);say(v<5?'Mars gravity: 3.71 m/s². Bumps send you flying.':'Earth gravity: 9.81 m/s². You stick to the ground much better.')};
+  const dust=[];
+  let last=performance.now(),raf;
+  function finish(reason){if(st.done)return;st.done=true;cancelAnimationFrame(raf);removeEventListener('keydown',kd);removeEventListener('keyup',kd);
+    const reached=st.x>=LEN;const sci=st.got.length*10+(reached?15:0);const half=st.hp<=0?.5:1;const gain=Math.round(sci*half);
+    S.science+=gain;S.battery=Math.max(0,S.battery-30);S.roverCool=2;
+    const crew=[S.crew.find(c=>c.role==='Geologist'),[...S.crew].filter(c=>c.role!=='Geologist').sort((a,b)=>a.dose-b.dose)[0]];
+    const d=0.35+st.dose;crew.forEach(c=>c.dose+=d);
+    let dmgNote='';if(st.hp<=0){const rv=S.modules.find(m=>m.type==='rover');if(rv&&S.spares<1){rv.broken=true;dmgNote=' The rover is broken until someone does a Maintain shift.'}else if(rv){S.spares--;dmgNote=' A spare part fixed the rover.'}}
+    log(`Rover expedition: ${st.got.length} samples${reached?', reached the beacon':''}. +${gain} science. ${crew.map(c=>c.name.split(' ')[0]).join(' and ')} took ${fmt(d,2)} mSv.`);
+    show(`<div class="card narrow"><div class="eyebrow">Expedition report</div><h2 style="font-size:26px">${reason}</h2>
+      <p><b>+${gain} science</b> from ${st.got.length} sample${st.got.length===1?'':'s'}${reached?' and the far beacon':''}${st.hp<=0?' (half lost when the rover was damaged)':''}.</p>
+      ${st.got.length?`<div class="sec">${st.got.map(s=>`<div class="didyou"><b>${s[1]}:</b> ${s[2]}</div>`).join('')}</div>`:''}
+      ${st.got.some(s=>s[0]==='ice')?photo('PIA10906','wide'):''}
+      <p class="note">${crew.map(c=>c.name).join(' and ')} each took ${fmt(d,2)} mSv. Rover battery used 30 kWh from the base.${dmgNote}</p>
+      <button class="cta" data-act="close" data-focus>Back to base</button></div>`);
+    world.syncModules();renderAll();award('speed');SFX.good()}
+  EXP.finish=()=>finish('Returned to base');
+  function step(now){
+    const dt=Math.min(.033,(now-last)/1000);last=now;if(st.done)return;st.t+=dt;
+    const k=st.keys;
+    if(st.drill>0){st.drill+=dt;st.vx*=.8;if(!k.drill){st.drill=0;say('Hold Drill until the sample is collected.',1800)}
+      else if(st.drill>1.4){const s=samples.find(s=>!s.got&&Math.abs(s.x-st.x)<3);if(s){s.got=true;st.got.push(s.type);SFX.right();say(`<b>${s.type[1]}:</b> ${s.type[2]}`,5200)}st.drill=0;k.drill=false}}
+    else{
+      if(k.right&&st.ground)st.vx=Math.min(14,st.vx+7*dt);
+      if(k.left&&st.ground)st.vx=Math.max(-3,st.vx-10*dt);
+      if(!k.right&&!k.left&&st.ground)st.vx*=1-1.2*dt;
+      if(k.drill){const s=samples.find(s=>!s.got&&Math.abs(s.x-st.x)<3);if(s&&Math.abs(st.vx)<1.2){st.drill=.01}else if(s){say('Too fast to drill. Stop first.',1500);k.drill=false}else{say('No sample here. Look for the glowing markers.',1500);k.drill=false}}
+    }
+    st.x=clamp(st.x+st.vx*dt,0,LEN+5);
+    if(st.ground){const vyG=slope(st.x)*st.vx;if(st.vy-vyG>st.grav*dt*2.2&&st.vx>2){st.ground=false}else{st.y=G(st.x);st.vy=vyG}}
+    if(!st.ground){st.vy-=st.grav*dt;st.y+=st.vy*dt;if(st.y<=G(st.x)){const imp=Math.abs(slope(st.x)*st.vx-st.vy);st.y=G(st.x);st.ground=true;
+      if(imp>5.2&&st.hitCd<=0){st.hp--;st.hitCd=1;st.vx*=.4;say(st.hp>0?`Hard landing (${fmt(imp,1)} m/s)! Hull damaged. Slow down over rocks.`:'The rover is badly damaged. Limping home.');if(st.hp<=0){setTimeout(()=>finish('Rover damaged'),900)}}
+      st.vy=slope(st.x)*st.vx}}
+    st.hitCd-=dt;
+    st.bat-=dt*(.32+.11*Math.abs(st.vx))+(st.drill>0?dt*.8:0);st.dose+=dt*.006;
+    if(Math.abs(st.vx)>3&&st.ground&&Math.random()<.6)dust.push({x:st.x-1.6,y:st.y+.2,vx:-st.vx*.2-Math.random(),vy:1+Math.random()*1.5,l:1});
+    for(const d of dust){d.x+=d.vx*dt;d.y+=d.vy*dt;d.vy-=st.grav*.3*dt;d.l-=dt*1.2}while(dust.length&&dust[0].l<=0)dust.shift();
+    if(st.x>=LEN){finish('Beacon reached!');return}
+    if(st.bat<=0){st.bat=0;finish('Battery reserve reached: heading home');return}
+    draw(now);
+    $('#xb').style.width=st.bat+'%';$('#xb').style.background=st.bat<25?'var(--bad)':'var(--good)';
+    $('#xh').textContent='■'.repeat(Math.max(0,st.hp))+'□'.repeat(3-Math.max(0,st.hp));$('#xs').textContent=fmt(Math.abs(st.vx),1)+' m/s';
+    $('#xd').textContent=fmt(st.x)+' / '+LEN+' m';$('#xr').textContent=fmt(0.35+st.dose,2)+' mSv';$('#xn').textContent=st.got.length+' / 6';
+    raf=requestAnimationFrame(step);
+  }
+  function draw(now){
+    const camX=st.x-14,base=Hh*.62;const toS=(x,y)=>[Math.round((x-camX)*PX),Math.round(base-(y)*PX)];
+    const sky=ctx.createLinearGradient(0,0,0,Hh);sky.addColorStop(0,'#c98f5e');sky.addColorStop(1,'#efc79a');ctx.fillStyle=sky;ctx.fillRect(0,0,W,Hh);
+    ctx.fillStyle='#f6eee0';ctx.fillRect(250,18,6,6);
+    // parallax hills
+    ctx.fillStyle='#b4704a';ctx.beginPath();ctx.moveTo(0,Hh);for(let x=0;x<=W;x+=4){const wx=(x/PX+camX*.25);ctx.lineTo(x,Math.round(68-10*Math.sin(wx*.05)-6*Math.sin(wx*.13)))}ctx.lineTo(W,Hh);ctx.fill();
+    ctx.fillStyle='#9a5636';ctx.beginPath();ctx.moveTo(0,Hh);for(let x=0;x<=W;x+=3){const wx=(x/PX+camX*.5);ctx.lineTo(x,Math.round(88-7*Math.sin(wx*.08+1)-4*Math.sin(wx*.2)))}ctx.lineTo(W,Hh);ctx.fill();
+    // ground
+    ctx.fillStyle='#7c3d22';ctx.beginPath();ctx.moveTo(0,Hh);for(let x=0;x<=W;x+=2){const [,y]=toS(camX+x/PX,g0(camX+x/PX));ctx.lineTo(x,y)}ctx.lineTo(W,Hh);ctx.fill();
+    ctx.fillStyle='#a2532c';for(let x=0;x<=W;x+=2){const [,y]=toS(camX+x/PX,g0(camX+x/PX));ctx.fillRect(x,y,2,2)}
+    // rocks
+    for(const r of rocks){if(r.x<camX-4||r.x>camX+52)continue;ctx.fillStyle='#4a2d24';
+      for(let x=r.x-r.w;x<r.x+r.w;x+=1/PX){const [sx,sy]=toS(x,G(x));const [,gy]=toS(x,g0(x));ctx.fillRect(sx,sy,1,Math.max(1,gy-sy+1))}
+      ctx.fillStyle='#6b4334';const [hx,hy]=toS(r.x-r.w*.3,G(r.x-r.w*.3));ctx.fillRect(hx,hy,2,1)}
+    // samples
+    for(const s of samples){if(s.got||s.x<camX-2||s.x>camX+50)continue;const [sx,sy]=toS(s.x,G(s.x));const bob=Math.round(Math.sin(now/250+s.x)*1.5);
+      ctx.fillStyle='rgba(143,216,242,.35)';ctx.fillRect(sx-4,sy-14+bob,9,9);ctx.fillStyle=s.type[3];ctx.fillRect(sx-2,sy-12+bob,5,5);ctx.fillStyle='#fff';ctx.fillRect(sx-1,sy-11+bob,1,1);
+      ctx.fillStyle='#8fd8f2';ctx.fillRect(sx,sy-4,1,3)}
+    // beacon
+    {const [bx,by]=toS(LEN,G(LEN));if(bx<W+10){ctx.fillStyle='#ddd';ctx.fillRect(bx,by-22,2,22);ctx.fillStyle=(now/300|0)%2?'#ff7d45':'#ffd0a0';ctx.fillRect(bx+2,by-22,8,5)}}
+    // dust
+    ctx.fillStyle='rgba(214,150,100,.7)';for(const d of dust){const [dx,dy]=toS(d.x,d.y);ctx.globalAlpha=Math.max(0,d.l);ctx.fillRect(dx,dy,2,2)}ctx.globalAlpha=1;
+    // rover
+    const ang=st.ground?Math.atan(slope(st.x)):Math.atan2(st.vy,Math.max(1,st.vx))*.5;const [rx,ry]=toS(st.x,st.y);
+    ctx.save();ctx.translate(rx,ry);ctx.rotate(-ang);
+    ctx.fillStyle='#222';[-8,0,8].forEach(wx=>ctx.fillRect(wx-2,-3,5,5));
+    ctx.fillStyle='#f2eee8';ctx.fillRect(-11,-10,22,6);ctx.fillStyle='#ff7d45';ctx.fillRect(-11,-6,22,1);
+    ctx.fillStyle='#2a2f38';ctx.fillRect(2,-14,8,4);ctx.fillStyle='#8fd8f2';ctx.fillRect(7,-13,2,2);
+    ctx.fillStyle='#ccc';ctx.fillRect(-8,-18,1,8);ctx.fillRect(-9,-19,3,2);
+    if(st.drill>0){ctx.fillStyle='#ddd';ctx.fillRect(10,-6,1,Math.round(st.drill*6))}
+    ctx.restore();
+    if(st.drill>0){ctx.fillStyle='#000a';ctx.fillRect(rx-15,ry-30,30,4);ctx.fillStyle='#8fd8f2';ctx.fillRect(rx-15,ry-30,Math.round(30*st.drill/1.4),4)}
+  }
+  raf=requestAnimationFrame(step);
+}
+const EXP={};
+
+/* ---------------- Debrief ---------------- */
+function debrief(){
+  S.phase='end';busy=false;renderAll();
+  const maxDose=Math.max(...S.crew.map(c=>c.dose));
+  const ratio=(a,b)=>b>0?Math.min(1,a/b):0;
+  const sc={
+    safety:S.failed?Math.round(Math.min(40,S.health*.4)):Math.round(clamp(.6*S.health+40*(1-maxDose/S.doseLimit),0,100)),
+    science:Math.round(clamp(S.science/S.sciGoal*100,0,100)),
+    selfsuff:Math.round(100*(ratio(S.made.o2,S.used.o2)+ratio(S.made.water,S.used.water)+ratio(S.made.food,S.used.food))/3),
+    budget:Math.round(clamp((S.budget-S.spent)/S.budget*150,0,100)),
+  };
+  const wsum=Object.values(S.weights).reduce((a,b)=>a+b,0)||1;
+  let total=Math.round(PRIOS.reduce((a,[k])=>a+sc[k]*S.weights[k],0)/wsum);
+  if(S.failed)total=Math.min(total,35);
+  const grade=S.failed?'F':total>=85?'S':total>=70?'A':total>=55?'B':total>=40?'C':'D';
+  const reason=!S.failed?`All four crew made it through ${S.N} sols.`:
+    S.failed==='oxygen'?`The oxygen ran out on sol ${S.sol}. Mission control ordered an emergency return.`:
+    S.failed==='health'?`Crew health collapsed on sol ${S.sol}. The flight surgeon called off the mission.`:
+    `${S.failed.split(':')[1]} passed the ${S.doseLimit} mSv radiation limit on sol ${S.sol}. The flight surgeon ordered everyone home.`;
+  // lessons
+  const L=[];const has=t=>S.modules.some(m=>m.type===t);
+  const nS=S.modules.filter(m=>m.type==='solar').length;
+  if(has('reactor'))L.push(`<b>Power:</b> the reactor cost 4 t and 18 M$, about a quarter of your mass, but it kept running through ${S.seen.storm?'the dust storm and ':''}every night.`);
+  else if(nS)L.push(`<b>Power:</b> ${nS} solar arrays were light and cheap${S.stormSolarMin!=null?`, but during the dust storm they fell to ${S.stormSolarMin}% of full power`:''}. Weight versus reliability.`);
+  if(S.blackouts.length)L.push(`<b>Blackouts on sol ${S.blackouts.slice(0,4).join(', ')}.</b> The heaters ran out of energy at night. More batteries, fewer machines, or a reactor would have prevented it.`);
+  L.push(`<b>Radiation:</b> highest dose ${fmt(maxDose,1)} of ${S.doseLimit} mSv. ${S.berm>=8?'Your crew-built regolith berm was free shielding paid for with time and outdoor dose.':S.berm>0?`The berm was ${Math.round(S.berm/8*100)}% finished.`:'No berm was built.'}${S.waterWall?' Water in the walls did double duty as shielding.':''}${S.poly?' Polyethylene panels bought shielding with money instead of time.':''}`);
+  L.push(`<b>Living off Mars:</b> the outpost made ${Math.round(ratio(S.made.o2,S.used.o2)*100)}% of its oxygen, ${Math.round(ratio(S.made.water,S.used.water)*100)}% of its water and ${Math.round(ratio(S.made.food,S.used.food)*100)}% of its food. Everything else had to be launched from Earth.`);
+  L.push(`<b>Iron triangle:</b> you used ${fmt(S.massUsed,1)} of ${S.massCap} t and ${S.spent} of ${S.budget} M$, for ${fmt(S.science)} science points.`);
+  S.choices.slice(-4).forEach(c=>L.push(`<b>Sol ${c.sol} · ${c.title}:</b> ${c.lesson}`));
+  const triangle=()=>{const v=[sc.budget/100,(S.failed?S.sol/S.N:1),sc.science/100,sc.safety/100];
+    const P=(a,r)=>[110+Math.sin(a)*r*80,105-Math.cos(a)*r*80];
+    const ax=[0,Math.PI*2/3,Math.PI*4/3];const lab=['Cost','Time','Scope'];
+    const pts=[v[0],v[1],v[2]].map((r,i)=>P(ax[i],Math.max(.05,r)));
+    return `<svg viewBox="0 0 220 210" width="220" height="210" role="img" aria-label="Iron triangle of cost, time and scope with quality in the middle">
+      <polygon points="${ax.map(a=>P(a,1).join(',')).join(' ')}" fill="none" stroke="#4b342b" stroke-width="1.5"/>
+      <polygon points="${pts.map(p=>p.join(',')).join(' ')}" fill="rgba(255,125,69,.3)" stroke="#ff7d45" stroke-width="2"/>
+      ${ax.map((a,i)=>{const [x,y]=P(a,1.18);return `<text x="${x}" y="${y+4}" fill="#f5e9df" font-size="12" text-anchor="middle" font-family="Chakra Petch,sans-serif">${lab[i]}</text>`}).join('')}
+      <text x="110" y="110" fill="#e9b680" font-size="11" text-anchor="middle" font-family="Chakra Petch,sans-serif">Quality ${sc.safety}</text></svg>`};
+  show(`<div class="card" style="max-width:1000px">
+    <div class="eyebrow">Mission debrief · ${RANKS[S.rank].label}</div>
+    <div class="row" style="gap:22px;align-items:center"><div class="grade">${grade}</div><div style="flex:1;min-width:220px"><h2 style="font-size:28px">${S.failed?'Mission aborted':'Mission complete'}</h2><p>${reason}</p><p class="mono" style="color:var(--sky)">Weighted score ${total} / 100</p></div>${triangle()}</div>
+    <div class="scores">${PRIOS.map(([k,l])=>`<div class="score"><div class="lbl">${l}</div><div class="v">${sc[k]}</div><div class="w">weight ${S.weights[k]} of ${wsum}</div></div>`).join('')}</div>
+    <div class="sec"><span class="lbl">How the outpost changed, sol by sol</span><div class="sparks">
+      ${[['o2','Oxygen (kg)','#80d897'],['water','Water (L)','#8fd8f2'],['food','Food (meals)','#e9b680'],['battery','Battery (kWh)','#f5c24f'],['dose','Highest dose (mSv)','#d48cf0']].map(([k,l])=>`<div class="spark"><div class="row" style="justify-content:space-between"><span class="lbl">${l}</span><span class="mono" style="font-size:12px">${S.hist.length?fmt(S.hist[S.hist.length-1][k],k==='dose'?1:0):'–'}</span></div><canvas data-spark="${k}"></canvas></div>`).join('')}
+    </div></div>
+    <div class="grid2" style="align-items:start">
+      <div class="sec"><span class="lbl">Trade-offs discovered · ${S.badges.length} of ${BADGES.length}</span><div class="badges">${BADGES.map(b=>`<span class="bdg ${S.badges.includes(b[0])?'on':''}" title="${esc(b[2])}">${b[1]}</span>`).join('')}</div></div>
+      <div class="sec"><span class="lbl">What you learned</span><p class="note" style="color:var(--fg)">Quiz: <b>${S.quiz.right} of ${S.quiz.total}</b> correct${S.quiz.total?` (${Math.round(S.quiz.right/S.quiz.total*100)}%)`:''}. ${S.labDone?'Wind tunnel lab completed.':'Try the wind tunnel in the NASA data room.'}</p></div></div>
+    <div class="sec"><span class="lbl">What your trade-offs did</span><ul class="lessons">${L.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+    <div class="didyou"><b>Real engineers</b> run thousands of simulations like this before a single bolt is launched. There is never one right answer, only better and worse trade-offs for what the mission values most.</div>
+    <div class="row"><button class="cta" data-act="again" data-focus>Fly again as ${RANKS[S.rank].label}</button><button class="ghost" data-act="title">Change rank</button></div>
+  </div>`);
+  if(S.failed)SFX.bad();else{SFX.badge();if(total>=55)confetti()}
+  requestAnimationFrame(()=>modal.querySelectorAll('canvas[data-spark]').forEach(cv=>{
+    const k=cv.dataset.spark;const col={o2:'#80d897',water:'#8fd8f2',food:'#e9b680',battery:'#f5c24f',dose:'#d48cf0'}[k];
+    const d=S.hist.map(h=>h[k]);const dpr=Math.min(2,devicePixelRatio||1);const w=cv.clientWidth,h=60;cv.width=w*dpr;cv.height=h*dpr;const c=cv.getContext('2d');c.scale(dpr,dpr);
+    if(d.length<2)return;const mx=Math.max(...d,k==='dose'?S.doseLimit:1),pad=4;
+    const X=i=>pad+i/(d.length-1)*(w-pad*2),Y=v=>h-pad-v/mx*(h-pad*2);
+    c.strokeStyle='rgba(189,165,148,.25)';c.lineWidth=1;[0.5,1].forEach(f=>{c.beginPath();c.moveTo(pad,Y(mx*f));c.lineTo(w-pad,Y(mx*f));c.stroke()});
+    if(k==='dose'){c.strokeStyle='#ff6253';c.setLineDash([3,3]);c.beginPath();c.moveTo(pad,Y(S.doseLimit));c.lineTo(w-pad,Y(S.doseLimit));c.stroke();c.setLineDash([])}
+    c.beginPath();d.forEach((v,i)=>i?c.lineTo(X(i),Y(v)):c.moveTo(X(i),Y(v)));c.lineTo(X(d.length-1),h-pad);c.lineTo(X(0),h-pad);c.closePath();c.fillStyle=col+'33';c.fill();
+    c.beginPath();d.forEach((v,i)=>i?c.lineTo(X(i),Y(v)):c.moveTo(X(i),Y(v)));c.strokeStyle=col;c.lineWidth=2;c.stroke();
+    c.fillStyle=col;c.beginPath();c.arc(X(d.length-1),Y(d[d.length-1]),3,0,7);c.fill()}));
+}
+
+function guide(){show(`<div class="card">
+  <div class="row" style="justify-content:space-between"><h2 style="font-size:26px">Field guide</h2><button class="ghost" data-act="close" data-focus>Close</button></div>
+  <div class="grid2">
+    <div class="sec"><span class="lbl">Each sol</span><p>1. Give every astronaut a task. 2. Check the power forecast and switch machines on or off in <b>Systems</b>. 3. Press <b>End Sol</b> and watch a full Martian day pass. 4. Make a decision if something happens.</p></div>
+    <div class="sec"><span class="lbl">Crew tasks</span>${Object.values(TASKS).map(t=>`<div class="note"><b style="color:var(--fg)">${t.label}${t.out?' (outside)':''}:</b> ${t.desc}</div>`).join('')}</div>
+    <div class="sec"><span class="lbl">Power, in plain words</span><p class="note" style="color:var(--fg)">Solar only works in daylight, so batteries must carry the habitat through the night. If power runs short, machines slow down first. If it is still short, the heaters fail and the crew gets cold and sick.</p></div>
+    <div class="sec"><span class="lbl">Radiation</span><p class="note" style="color:var(--fg)">Every sol adds dose. Inside, shielding cuts it: a regolith berm (−45%), a water wall (−35%) and polyethylene (−30%) stack. Outside, nothing helps. Solar storms are the real danger: get inside.</p></div>
+    <div class="sec"><span class="lbl">Engineering trade-offs you will meet</span><p class="note" style="color:var(--fg)"><b>Weight vs strength:</b> reactor vs solar. <b>Speed vs cost:</b> poly panels vs a slow berm. <b>Throughput vs safety:</b> outdoor work vs dose. <b>Quality vs price:</b> spares vs more cargo.</p></div>
+    <div class="sec"><span class="lbl">Sources for the science</span><p class="note">Solar storm and CME data: NASA DONKI space weather database (see NASA data). Photos: images.nasa.gov. Numbers are simplified for play. Real values from NASA missions: sol length, gravity, Curiosity RAD dose (~0.67 mSv/sol), Phoenix ice and perchlorate (2008), MOXIE oxygen from CO₂, Kilopower fission (~10 kW).</p></div>
+  </div></div>`)}
+function fullLog(){show(`<div class="card narrow"><div class="row" style="justify-content:space-between"><h2 style="font-size:24px">Mission log</h2><button class="ghost" data-act="close" data-focus>Close</button></div>
+  <div class="sec">${S.log.map(l=>`<div class="note" style="color:var(--fg)"><span class="mono" style="color:var(--rust)">SOL ${l.sol}</span> ${esc(l.msg)}</div>`).join('')}</div></div>`)}
+
+/* =====================================================================
+   NASA DATA · SOUND · TRADE-OFF BADGES · QUIZ · LABS
+   ===================================================================== */
+const NASA={"fetched": "2026-11-14", "sepWindow": ["2025-11-14", "2026-11-08"], "sepEvents": [{"date": "2025-11-14", "time": "09:20", "readings": 7, "instruments": ["GOES-P: SEISS >10 MeV", "MODEL: REleASE:ACE/EPAM 15.8-39.8 MeV", "MODEL: REleASE:SOHO/EPHIN 15.8-39.8 MeV", "SOHO: COSTEP 15.8-39.8 MeV", "STEREO A: IMPACT 13-100 MeV"], "flare": "2025-11-14 07:44", "cme": "2025-11-13 03:24", "over100": false}, {"date": "2026-01-18", "time": "22:33", "readings": 9, "instruments": ["GOES-P: SEISS >10 MeV", "MODEL: REleASE:ACE/EPAM 15.8-39.8 MeV", "MODEL: REleASE:ACE/EPAM 28.2-50.1 MeV", "MODEL: REleASE:SOHO/EPHIN 15.8-39.8 MeV", "MODEL: REleASE:SOHO/EPHIN 28.2-50.1 MeV", "SOHO: COSTEP 15.8-39.8 MeV", "SOHO: COSTEP 28.2-50.1 MeV", "STEREO A: IMPACT 13-100 MeV"], "flare": "2026-01-18 17:27", "cme": "2026-01-18 18:09", "over100": false}, {"date": "2026-05-25", "time": "23:31", "readings": 8, "instruments": ["GOES-P: SEISS >10 MeV", "MODEL: REleASE:ACE/EPAM 15.8-39.8 MeV", "MODEL: REleASE:ACE/EPAM 28.2-50.1 MeV", "MODEL: REleASE:SOHO/EPHIN 15.8-39.8 MeV", "MODEL: REleASE:SOHO/EPHIN 28.2-50.1 MeV", "SOHO: COSTEP 15.8-39.8 MeV", "SOHO: COSTEP 28.2-50.1 MeV", "STEREO A: IMPACT 13-100 MeV"], "flare": null, "cme": "2026-05-25 22:12", "over100": false}, {"date": "2026-06-06", "time": "15:14", "readings": 1, "instruments": ["MODEL: REleASE:SOHO/EPHIN 28.2-50.1 MeV"], "flare": "2026-06-06 13:40", "cme": "2026-06-06 14:11", "over100": false}, {"date": "2026-07-30", "time": "18:20", "readings": 6, "instruments": ["GOES-P: SEISS >10 MeV", "GOES-P: SEISS >100 MeV", "MODEL: REleASE:ACE/EPAM 15.8-39.8 MeV", "MODEL: REleASE:ACE/EPAM 28.2-50.1 MeV", "SOHO: COSTEP 15.8-39.8 MeV", "SOHO: COSTEP 28.2-50.1 MeV"], "flare": "2026-07-30 15:53", "cme": "2026-07-30 16:53", "over100": true}, {"date": "2026-08-20", "time": "20:23", "readings": 3, "instruments": ["STEREO A: IMPACT 13-100 MeV"], "flare": "2026-08-21 09:09", "cme": "2026-08-20 18:48", "over100": false}, {"date": "2026-09-05", "time": "15:45", "readings": 8, "instruments": ["GOES-P: SEISS >10 MeV", "GOES-P: SEISS >100 MeV", "MODEL: REleASE:ACE/EPAM 15.8-39.8 MeV", "MODEL: REleASE:ACE/EPAM 28.2-50.1 MeV", "MODEL: REleASE:SOHO/EPHIN 15.8-39.8 MeV", "MODEL: REleASE:SOHO/EPHIN 28.2-50.1 MeV", "SOHO: COSTEP 15.8-39.8 MeV", "SOHO: COSTEP 28.2-50.1 MeV"], "flare": "2026-09-05 15:04", "cme": "2026-09-05 15:36", "over100": true}], "sepReadings": 42, "cmeWindow": ["2026-10-01", "2026-11-14"], "cmeCount": 130, "cmeWithSpeed": 129, "cmeMedian": 375, "cmeFastest": [{"id": "2026-10-17T02:48:00-CME-001", "start": "2026-10-17 02:48", "speed": 1048, "type": "O", "half": 38.0, "note": "CME first seen to the ESE in SOHO LASCO C2 starting at 2026-10-17T02:48Z. It is also seen to the E in SOHO LASCO C3. The CME is also seen later in its propagati"}, {"id": "2026-11-10T05:30:00-CME-001", "start": "2026-11-10 05:30", "speed": 974, "type": "C", "half": 11.0, "note": "Thin, faint CME observed to the W in GOES CCOR-1 (partially obscured by earthshine) and STEREO A COR2, also in SOHO LASCO C2/C3 after a data gap spanning approx"}, {"id": "2026-10-21T20:36:00-CME-001", "start": "2026-10-21 20:36", "speed": 973, "type": "C", "half": 46.0, "note": "CME observed to the NNE in SOHO LASCO C2/C3 and GOES CCOR-1, and to the NW in STEREO A COR2. The source is likely far-sided and may not be observed, with the on"}, {"id": "2026-10-20T14:23:00-CME-001", "start": "2026-10-20 14:23", "speed": 920, "type": "C", "half": 13.0, "note": "Narrow CME first seen to the NW in STEREO A COR2 starting around 2026-10-20T14:23Z. It is also seen to the NNW in SOHO LASCO C2/C3 and GOES CCOR-1. There are no"}, {"id": "2026-11-05T20:00:00-CME-001", "start": "2026-11-05 20:00", "speed": 915, "type": "C", "half": 13.0, "note": "CME first seen in white light imagery to the E in GOES CCOR-1 starting at 2026-11-05T20:00Z. In real time, this CME is covered by data gaps in SOHO LASCO and ST"}, {"id": "2026-11-01T00:00:00-CME-001", "start": "2026-11-01 00:00", "speed": 894, "type": "C", "half": 14.0, "note": "Diffuse CME first seen to the SE by SOHO LASCO C2 beginning at 2026-11-01T00:00Z, as well as by SOHO LASCO C3, STEREO A COR2 and GOES CCOR-1 in later frames. Th"}, {"id": "2026-10-26T09:00:00-CME-001", "start": "2026-10-26 09:00", "speed": 873, "type": "C", "half": 11.0, "note": "CME observed to the SW in SOHO LASCO C2/C3 and GOES CCOR-1 and to the SE in STEREO A COR2. This CME precedes and is partially overlapped by the larger CME: 2026"}, {"id": "2026-10-08T18:38:00-CME-001", "start": "2026-10-08 18:38", "speed": 868, "type": "C", "half": 18.0, "note": "Faint CME observed to the E only in STEREO A COR2 Science Data, as a real-time gap in STEREO A COR2 beacon data spanning 2026-10-08T18:53Z to 2026-10-09T17:53Z "}], "cmeHist": [22, 69, 21, 16, 1, 0]};
+NASA.src='snapshot';
+const SOL_DAYS=1.0275;
+const NIMG={
+  PIA19400:['Sunset in Gale Crater','2015-05-08','Curiosity’s first colour sunset. Fine dust lets blue light through near the Sun, so Martian sunsets glow blue. Watch for it in the 3D sky every sol.'],
+  PIA22521:['Shades of Martian darkness','2018-06-13','A simulated view of the Sun fading as the 2018 global dust storm thickened over the Opportunity rover. Your dust storm event is based on it.'],
+  PIA26302:['Curiosity sees a solar storm','2024-06-10','On 20 May 2024 specks and streaks appeared in Curiosity’s camera: charged particles from the Sun hitting the detector. That is the radiation your shielding blocks.'],
+  PIA24203:['MOXIE, tucked inside Perseverance','2021-01-19','MOXIE split oxygen out of Martian CO₂ on the real planet. The game’s CO₂ Oxygen Maker is a scaled-up MOXIE.'],
+  PIA12120:['A huge dust devil near Spirit','2009-07-14','Dust devils like this one cleaned the solar panels of Spirit and Opportunity for years. In the game they can clean yours.'],
+  PIA10906:['Disappearing ice at the Phoenix site','2008-06-20','Phoenix dug a trench and watched bright chunks of ice vanish over four days. Proof that water ice sits right under your outpost.'],
+  PIA12338:['Phoenix in winter','2009-11-04','An orbiter photographed Phoenix surrounded by dry-ice (CO₂) frost. Your mission’s polar winter works the same way.'],
+  PIA10959:['Phoenix’s soil scoop','2008-07-15','Phoenix scooped the soil where perchlorate was discovered. Your greenhouse soil has to be washed of it first.'],
+  PIA10651:['The north polar ice cap','2008-05-15','Radar measured the layered ice cap near your landing site. Its CO₂ frost grows and shrinks with the seasons.'],
+  PIA16938:['Where space radiation comes from','2013-05-30','The two kinds of radiation Curiosity’s RAD instrument measures: cosmic rays and solar particles. Earth’s magnetic field shields us. Mars has none.'],
+  RASSOR:['RASSOR digging robot','2016-09-29','A NASA robot tested in a bin of simulated regolith. Machines like this could pile up a regolith berm so the crew stays inside.'],
+  VEGGIE:['Plants under LED grow lights','2018-03-07','Tomatoes growing under red and blue LEDs in NASA’s Veggie tests. Grow lights are why your greenhouse needs 50 kWh per sol.'],
+};
+const imgUrl=k=>`nasa/${k}.jpg`;
+const imgLink=k=>k.startsWith('PIA')?`https://images.nasa.gov/details/${k}`:`https://images.nasa.gov/search?q=${encodeURIComponent(NIMG[k][0])}`;
+function photo(k,cls=''){const m=NIMG[k];if(!m)return '';return `<figure class="nphoto ${cls}"><img src="${imgUrl(k)}" alt="${esc(m[0])}" loading="lazy" onerror="this.closest('figure').classList.add('noimg')"><figcaption><b>${m[0]}</b> ${m[2]} <a href="${imgLink(k)}" target="_blank" rel="noopener">NASA, ${m[1].slice(0,4)}</a></figcaption></figure>`}
+function sepStats(sols){const days=(new Date(NASA.sepWindow[1])-new Date(NASA.sepWindow[0]))/864e5+1;const n=NASA.sepEvents.length;const exp=n/days*sols*SOL_DAYS;return {n,days:Math.round(days),exp,p:1-Math.exp(-exp)}}
+async function refreshNasa(){
+  // Works when the game runs from a laptop or website. Inside a sandboxed page it falls back to the saved snapshot.
+  try{
+    const end=new Date(),start=new Date(Date.now()-40*864e5);const f=d=>d.toISOString().slice(0,10);
+    const ctl=new AbortController();const tm=setTimeout(()=>ctl.abort(),7000);
+    const r=await fetch(`https://api.nasa.gov/DONKI/CME?startDate=${f(start)}&endDate=${f(end)}&api_key=DEMO_KEY`,{signal:ctl.signal});clearTimeout(tm);
+    if(!r.ok)return;const d=await r.json();if(!Array.isArray(d)||!d.length)return;
+    const cm=[];for(const e of d){const an=(e.cmeAnalyses||[]).filter(a=>a&&a.speed);if(!an.length)continue;const a=an.find(x=>x.isMostAccurate)||an[0];
+      cm.push({id:e.activityID,start:(e.startTime||'').replace('T',' ').replace('Z',''),speed:Math.round(a.speed),type:a.type,note:(e.note||'').slice(0,160)})}
+    if(!cm.length)return;cm.sort((a,b)=>b.speed-a.speed);const sp=cm.map(x=>x.speed).sort((a,b)=>a-b);
+    Object.assign(NASA,{src:'live',cmeWindow:[f(start),f(end)],cmeCount:d.length,cmeWithSpeed:cm.length,cmeMedian:sp[sp.length>>1],cmeFastest:cm.slice(0,8),
+      cmeHist:[[0,300],[300,500],[500,700],[700,1000],[1000,1500],[1500,1e9]].map(([lo,hi])=>sp.filter(s=>s>=lo&&s<hi).length)});
+  }catch(e){}
+}
+const srcBadge=()=>NASA.src==='live'?`<span class="chip good"><span class="dot"></span>Live from NASA DONKI</span>`:`<span class="chip"><span class="dot" style="color:var(--sky)"></span>NASA DONKI data · fetched ${NASA.fetched}</span>`;
+
+/* ---- Sound ---- */
+const SFX=(()=>{let ac=null,on=true;
+  const ctx=()=>{if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){ac=null}}if(ac&&ac.state==='suspended')ac.resume().catch(()=>{});return ac};
+  function tone(f,d,type='sine',v=.07,slide=0,delay=0){const a=ctx();if(!a||!on)return;const t=a.currentTime+delay;const o=a.createOscillator(),g=a.createGain();o.type=type;o.frequency.setValueAtTime(f,t);
+    if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,f+slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+d+.05)}
+  function noise(d,v=.04,freq=600){const a=ctx();if(!a||!on)return;const b=a.createBuffer(1,a.sampleRate*d,a.sampleRate),ch=b.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=(Math.random()*2-1)*(1-i/ch.length);
+    const s=a.createBufferSource();s.buffer=b;const fl=a.createBiquadFilter();fl.type='lowpass';fl.frequency.value=freq;const g=a.createGain();g.gain.value=v;s.connect(fl);fl.connect(g);g.connect(a.destination);s.start()}
+  return {wake:ctx,click(){tone(700,.05,'square',.02)},sol(){noise(2.2,.05,500);tone(110,2,'sine',.05,60)},alarm(){[0,.22,.44].forEach(x=>tone(880,.16,'square',.04,-260,x))},
+    good(){[523,659,784].forEach((f,i)=>tone(f,.28,'triangle',.06,0,i*.09))},badge(){[523,784,1046,1318].forEach((f,i)=>tone(f,.32,'triangle',.06,0,i*.08))},
+    bad(){tone(240,.5,'sawtooth',.04,-140)},right(){tone(660,.12,'triangle',.06);tone(990,.25,'triangle',.06,0,.1)},wrong(){tone(200,.3,'square',.04,-60)},
+    whoosh(){noise(1.2,.06,1400)},set(v){on=v},get on(){return on}}})();
+function shake(kind){document.body.classList.remove('shake','flash-red','flash-white');void document.body.offsetWidth;document.body.classList.add('shake',kind==='spe'?'flash-white':'flash-red');setTimeout(()=>document.body.classList.remove('shake','flash-red','flash-white'),900)}
+
+/* ---- Read aloud: Claude voice where the viewer allows it, else the browser's voice ---- */
+let TTS=null;
+(async()=>{try{if(window.claude&&typeof claude.use==='function')TTS=await claude.use('tts')}catch(e){TTS=null}})();
+const canSpeak=()=>!!TTS||('speechSynthesis' in window);
+function speak(text){const plain=String(text).replace(/<[^>]+>/g,'').slice(0,1900);
+  if(TTS){TTS.speak(plain).catch(()=>{if('speechSynthesis' in window){speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(plain))}});return}
+  if('speechSynthesis' in window){speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(plain);u.rate=.98;speechSynthesis.speak(u)}}
+let SPEAK_TEXT='';
+
+/* ---- Trade-off badges (from the engineering trade-offs talk) ---- */
+const BADGES=[
+  ['iron','Iron triangle','Time, cost and scope pull against each other: you packed a rocket with fixed mass and money.'],
+  ['weights','Weighted requirements','You ranked what matters most, and your score follows those weights.'],
+  ['weight','Weight vs strength','Sturdy, reliable gear (a reactor, shielding, tanks) uses mass that could carry something else.'],
+  ['speed','Speed vs cost','Fast and expensive, or slow and cheap: poly panels vs a hand-built berm, or racing the rover vs saving battery.'],
+  ['quality','Quality vs price','Spare parts cost mass up front but turn breakdowns into small delays.'],
+  ['latency','Latency vs throughput','A small answer right now, or a big pile of data later.'],
+  ['consist','Consistency vs availability','Stop until every reading agrees, or keep running on your best guess.'],
+  ['safety','Safety vs progress','Outdoor work gets things done but adds radiation dose.'],
+];
+function award(id){if(!S||!S.badges||S.badges.includes(id))return;S.badges.push(id);const b=BADGES.find(x=>x[0]===id);if(!b)return;SFX.badge();
+  toast(`<span class="lbl" style="color:var(--rust)">Trade-off discovered ${S.badges.length}/${BADGES.length}</span><br><b>${b[1]}</b> · ${b[2]}`,5200);if(typeof renderAll==='function')renderAll()}
+
+/* ---- Ask the Scientist quiz (questions from the talk and NASA data) ---- */
+const QUIZ=[
+  ['How long is one day (a sol) on Mars?',['24 hours 37 minutes','Exactly 24 hours','About 30 hours'],0,'Mars spins a little slower than Earth, so a sol is 24 h 37 min.'],
+  ['Why should astronauts not swallow Martian dirt?',['It has perchlorate salts that stop the thyroid using iodine','It is radioactive','It is magnetic'],0,'Phoenix found perchlorate in 2008. Washing soil and iodine supplements are the counter-measures.'],
+  ['What protects people on Earth from most cosmic rays?',['Earth’s magnetic field and thick air','The Moon','Clouds'],0,'Mars lost its global magnetic field and has thin air, so radiation reaches the ground.'],
+  ['Gravity on Mars is about…',['One third of Earth’s','Half of Earth’s','The same as Earth’s'],0,'3.71 m/s² against Earth’s 9.81 m/s²: about 38%.'],
+  ['Why does air pressure on Mars drop in winter?',['CO₂ freezes onto the polar cap as frost','Wind blows the air into space','Plants breathe it in'],0,'It is so cold at the poles that the main gas in the air turns to ice.'],
+  ['Where can a Mars crew find water?',['Buried ice and water locked inside sulfate minerals','Rivers and lakes','Rain'],0,'Phoenix found ice just under the soil. Heating sulfates also releases water.'],
+  ['Where do most rocks on Mars come from?',['Volcanic eruptions','Meteorites','Ancient coral reefs'],0,'Most Martian rock is volcanic basalt. Regolith is crushed volcanic rock.'],
+  ['Why did scientists blow walnut shells in wind tunnels?',['Light grains help copy how sand moves in Mars’ thin air','They look like Mars rocks','They are a cheap snack'],0,'Thin air pushes weakly, so lighter test grains help researchers study Martian wind.'],
+  ['Which power source keeps working in a dust storm?',['A fission reactor','Solar panels','Both work equally well'],0,'Opportunity’s solar panels went dark in the 2018 storm. A reactor does not need sunlight.'],
+  [()=>`NASA’s DONKI database recorded how many solar particle storms near Earth from ${NASA.sepWindow[0]} to ${NASA.sepWindow[1]}?`,[()=>`About ${NASA.sepEvents.length}`,()=>`About ${NASA.sepEvents.length*10}`,()=>'None'],0,()=>`${NASA.sepEvents.length} separate storms, made of ${NASA.sepReadings} readings from satellites like GOES and SOHO.`],
+  ['Which NASA experiment made oxygen on Mars?',['MOXIE on Perseverance','Phoenix’s scoop','The Hubble telescope'],0,'MOXIE split CO₂ into oxygen and carbon monoxide on Mars, 2021 to 2023.'],
+  ['Light from a solar flare reaches Mars in about 13 minutes. A 1,000 km/s CME takes about…',['2.5 days','13 minutes','1 year'],0,'227 million km ÷ 1,000 km/s ≈ 63 hours. That gap is your warning time.'],
+  ['The iron triangle of engineering links which three things?',['Time, cost and scope','Air, water and food','Speed, height and weight'],0,'Push one corner and the others move. Quality sits in the middle.'],
+  ['Sending a rover’s big photo pack later through an orbiter relay chooses…',['Throughput over latency','Latency over throughput','Neither'],0,'You wait longer (latency) but send much more data (throughput).'],
+];
+const qv=v=>typeof v==='function'?v():v;
+function askQuiz(){
+  const left=QUIZ.map((q,i)=>i).filter(i=>!S.quiz.asked.includes(i));if(!left.length)return false;
+  const i=pick(left);S.quiz.asked.push(i);const q=QUIZ[i];
+  const order=[0,1,2].sort(()=>Math.random()-.5);S.curQuiz={i,order};
+  SPEAK_TEXT=qv(q[0])+'. '+order.map(k=>qv(q[1][k])).join('. Or. ');
+  show(`<div class="card narrow" role="dialog" aria-labelledby="qz">
+    <div class="row" style="justify-content:space-between"><div class="eyebrow" style="color:var(--ice)">Ask the scientist · Sol ${S.sol}</div>${canSpeak()?'<button class="sbtn" data-act="speak">Read aloud</button>':''}</div>
+    <h2 id="qz" style="font-size:24px">${qv(q[0])}</h2>
+    <div class="opts">${order.map((k,j)=>`<button class="opt" data-act="quiz" data-arg="${k}" ${j===0?'data-focus':''}><span class="l" style="font-size:15px">${qv(q[1][k])}</span></button>`).join('')}</div>
+    <p class="note">Right answers earn science points. Three in a row earns a spare part.</p></div>`);
+  return true;
+}
+function answerQuiz(k){const q=QUIZ[S.curQuiz.i];const ok=+k===q[2];S.quiz.total++;
+  if(ok){S.quiz.right++;S.quiz.streak++;S.science+=6;S.morale=Math.min(100,S.morale+3);SFX.right()}else{S.quiz.streak=0;SFX.wrong()}
+  let bonus='';if(ok&&S.quiz.streak%3===0){S.spares++;bonus=' Three in a row: <b>+1 spare part</b>!'}
+  show(`<div class="card narrow"><div class="eyebrow" style="color:${ok?'var(--good)':'var(--bad)'}">${ok?'Correct!':'Not quite'}</div>
+    <h2 style="font-size:22px">${ok?'+6 science, +3 morale.':'The answer: '+qv(q[1][q[2]])}${bonus}</h2>
+    <p>${qv(q[3])}</p><p class="note">Score so far: ${S.quiz.right} of ${S.quiz.total}.</p>
+    <button class="cta" data-act="close" data-focus>Back to the outpost</button></div>`);
+  log(`Quiz: ${ok?'correct':'missed'} (${S.quiz.right}/${S.quiz.total}).`);
+}
+
+/* ---- Confetti ---- */
+function confetti(){const c=document.createElement('canvas');c.style.cssText='position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:40';document.body.appendChild(c);
+  const x=c.getContext('2d');c.width=innerWidth;c.height=innerHeight;const cols=['#ff7d45','#e9b680','#8fd8f2','#80d897','#f5c24f'];
+  const P=Array.from({length:160},()=>({x:Math.random()*c.width,y:-20-Math.random()*c.height*.5,vx:(Math.random()-.5)*3,vy:2+Math.random()*3,r:Math.random()*6,c:pick(cols),s:4+Math.random()*5}));
+  let t=0;(function f(){x.clearRect(0,0,c.width,c.height);P.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.r+=.1;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);x.restore()});
+    if(++t<200)requestAnimationFrame(f);else c.remove()})()}
+
+/* ---- NASA Data Room ---- */
+const DR={tab:'storms',sep:null,cme:0,sols:30,wt:{atm:'mars',grain:'sand',wind:12},raf:0};
+function dataRoom(tab){DR.tab=tab||DR.tab;cancelAnimationFrame(DR.raf);
+  const tabs=[['storms','Solar storms'],['cme','CME race'],['wind','Wind tunnel'],['photos','Photo evidence']];
+  let body='';
+  if(DR.tab==='storms'){
+    const st=sepStats(DR.sols);const a=new Date(NASA.sepWindow[0]),b=new Date(NASA.sepWindow[1]);const span=b-a;
+    const months=[];for(let d=new Date(a.getFullYear(),a.getMonth()+1,1);d<b;d.setMonth(d.getMonth()+1))months.push(new Date(d));
+    const sel=DR.sep!=null?NASA.sepEvents[DR.sep]:null;
+    body=`<p>Every dot is a real <b>solar particle storm</b>: a burst of fast protons from the Sun, recorded by NASA satellites near Earth and logged in NASA’s DONKI space weather database. Tap a dot.</p>
+    <div class="tl" role="list">${months.map(m=>`<span class="tlm" style="left:${(m-a)/span*100}%">${m.toLocaleString('en',{month:'short'})}</span>`).join('')}
+      ${NASA.sepEvents.map((e,i)=>`<button class="tld ${e.over100?'hot':''} ${DR.sep===i?'on':''}" role="listitem" style="left:${(new Date(e.date)-a)/span*100}%" data-act="sepdot" data-arg="${i}" aria-label="Solar particle storm ${e.date}"></button>`).join('')}</div>
+    <div class="row note"><span><span class="dot" style="color:var(--sky)"></span> above 10 MeV</span><span><span class="dot" style="color:var(--bad)"></span> above 100 MeV (strongest)</span><span>${NASA.sepWindow[0]} to ${NASA.sepWindow[1]}</span></div>
+    ${sel?`<div class="fact"><span class="n" style="font-size:20px">${sel.date} · ${sel.time} UTC</span><span class="d" style="color:var(--fg)">${sel.readings} readings. ${sel.over100?'Protons above <b>100 MeV</b>, strong enough to get through thin walls.':'Protons above 10 MeV.'} ${sel.flare?`Linked to a solar flare at ${sel.flare} UTC`:''}${sel.cme?`${sel.flare?' and a':'Linked to a'} CME launched ${sel.cme} UTC`:''}.</span><span class="d">Instruments: ${sel.instruments.slice(0,4).join(' · ')}</span></div>`:''}
+    <div class="grid2" style="align-items:center">
+      <div class="sec"><span class="lbl">How likely is a storm during a mission?</span>
+        <label class="prio" style="grid-template-columns:110px 1fr 70px"><span>Mission length</span><input type="range" id="sols" min="10" max="700" step="10" value="${DR.sols}" data-dr="sols"><span class="mono" id="solsv">${DR.sols} sols</span></label>
+        <div class="fact"><span class="n" id="pv">${Math.round(st.p*100)}%</span><span class="d" id="pd">chance of at least one storm (about ${fmt(st.exp,1)} expected), if storms come at last year’s rate.</span></div></div>
+      <div class="didyou"><b>How we used this data:</b> ${st.n} storms in ${st.days} days is about one every ${Math.round(st.days/st.n)} days. A ${S.N||30}-sol game would expect ${fmt(sepStats(S.N||30).exp,1)}. We put <b>2</b> in every mission on purpose: a busy solar-maximum test, so every player has to practise sheltering. A real 500-sol stay would expect about ${Math.round(sepStats(500).exp)}. These storms were measured near Earth; Mars gets its own, but at a similar rate.</div>
+    </div>`;
+  }else if(DR.tab==='cme'){
+    const list=NASA.cmeFastest.slice(0,6);const c=list[DR.cme]||list[0];
+    body=`<p>A <b>coronal mass ejection (CME)</b> is a cloud of solar plasma flung into space. Pick a real CME from NASA’s list and race it to Earth and Mars. The light from the eruption arrives first, so how long the cloud takes is your <b>warning time</b>.</p>
+    <div class="row">${list.map((x,i)=>`<button class="sbtn ${i===DR.cme?'primary':''}" data-act="cmepick" data-arg="${i}">${x.speed} km/s · ${x.start.slice(5,10)}</button>`).join('')}</div>
+    <canvas id="cmecv" width="640" height="190" style="width:100%;max-width:100%;aspect-ratio:640/190;border:1px solid var(--line);border-radius:6px;background:#0d0a12" aria-label="Animation of a CME travelling from the Sun to Earth and Mars"></canvas>
+    <div class="grid3"><div class="fact"><span class="n" id="cme-e">${fmt(149.6e6/c.speed/3600)} h</span><span class="d">to Earth (150 million km)</span></div>
+      <div class="fact"><span class="n" id="cme-m">${fmt(227.9e6/c.speed/3600)} h</span><span class="d">to Mars (228 million km, average)</span></div>
+      <div class="fact"><span class="n">12.7 min</span><span class="d">for the flash of light to reach Mars</span></div></div>
+    <div class="row"><button class="cta" data-act="cmego">Launch this CME</button><span class="note">CME ${esc(c.id)} · launched ${c.start} UTC${c.note?` · “${esc(c.note.slice(0,110))}…”`:''}</span></div>
+    <div class="didyou"><b>From the data:</b> NASA logged <b>${NASA.cmeCount} CMEs</b> between ${NASA.cmeWindow[0]} and ${NASA.cmeWindow[1]}. The typical (median) speed was ${NASA.cmeMedian} km/s and the fastest was ${NASA.cmeFastest[0].speed} km/s. We assume constant speed; real CMEs speed up or slow down in the solar wind. Fast particles can arrive in under an hour, which is why the game’s solar storm warning gives you just one sol.</div>
+    <div class="spark"><span class="lbl">CME speeds, ${NASA.cmeWindow[0]} to ${NASA.cmeWindow[1]}</span>${cmeHistSvg()}</div>`;
+  }else if(DR.tab==='wind'){
+    body=`<p>In the talk, the planetary scientist explained how researchers blow <b>ground walnut shells</b> through wind tunnels to copy how Martian winds move sand. Thin air pushes weakly, so it takes a much faster wind to lift a grain on Mars. Try it.</p>
+    <canvas id="wtcv" width="640" height="200" style="width:100%;max-width:100%;aspect-ratio:640/200;border:1px solid var(--line);border-radius:6px;background:#140d0b" aria-label="Wind tunnel simulation"></canvas>
+    <div class="grid2">
+      <div class="sec"><label class="prio" style="grid-template-columns:90px 1fr 70px"><span>Wind speed</span><input type="range" id="wind" min="0" max="45" step="1" value="${DR.wt.wind}" data-dr="wind"><span class="mono" id="windv">${DR.wt.wind} m/s</span></label>
+        <div class="row"><span class="lbl">Air</span><button class="sbtn ${DR.wt.atm==='earth'?'primary':''}" data-act="wt" data-arg="atm:earth">Earth · 1013 mbar</button><button class="sbtn ${DR.wt.atm==='mars'?'primary':''}" data-act="wt" data-arg="atm:mars">Mars · 6 mbar</button></div>
+        <div class="row"><span class="lbl">Grains</span><button class="sbtn ${DR.wt.grain==='sand'?'primary':''}" data-act="wt" data-arg="grain:sand">Sand</button><button class="sbtn ${DR.wt.grain==='walnut'?'primary':''}" data-act="wt" data-arg="grain:walnut">Walnut shell</button></div></div>
+      <div class="fact"><span class="n" id="wtstate">Still</span><span class="d" id="wtd"></span></div></div>
+    <div class="didyou"><b>Challenge:</b> find the wind speed that starts sand moving on Mars, then on Earth. How many times faster is it? The thresholds here are rounded teaching values. Wind-tunnel studies agree on the big idea: in Mars’ thin air the wind must blow several times faster than on Earth to lift the same sand.</div>`;
+  }else{
+    body=`<p>Every photo below is from NASA’s image library and links to its official record. Each one shows something you meet in the game.</p><div class="pgrid">${Object.keys(NIMG).map(k=>photo(k)).join('')}</div>`;
+  }
+  show(`<div class="card" style="max-width:980px"><div class="row" style="justify-content:space-between"><div><div class="eyebrow">NASA data room</div><h2 style="font-size:26px">Real data behind the game</h2></div><div class="row">${srcBadge()}<button class="ghost" data-act="close" data-focus>Close</button></div></div>
+    <div class="rtabs" role="tablist">${tabs.map(([k,l])=>`<button role="tab" data-act="drtab" data-arg="${k}" aria-selected="${DR.tab===k}">${l}</button>`).join('')}</div>${body}</div>`);
+  if(DR.tab==='cme')cmeDraw(0);
+  if(DR.tab==='wind')windTunnel();
+}
+function cmeHistSvg(){const h=NASA.cmeHist,L=['<300','300–500','500–700','700–1000','1000–1500','1500+'],mx=Math.max(...h,1);
+  return `<svg viewBox="0 0 600 120" width="100%" role="img" aria-label="Histogram of CME speeds">${h.map((v,i)=>{const bw=84,x=20+i*96,bh=v/mx*80;return `<rect x="${x}" y="${92-bh}" width="${bw}" height="${bh}" rx="2" fill="#e9b680"/><text x="${x+bw/2}" y="${86-bh}" fill="#f5e9df" font-size="12" text-anchor="middle" font-family="JetBrains Mono,monospace">${v}</text><text x="${x+bw/2}" y="110" fill="#bda594" font-size="11" text-anchor="middle" font-family="JetBrains Mono,monospace">${L[i]} km/s</text>`}).join('')}</svg>`}
+function cmeDraw(prog,c){const cv=$('#cmecv');if(!cv)return;const x=cv.getContext('2d'),W=640,H=190;x.clearRect(0,0,W,H);
+  for(let i=0;i<60;i++){x.fillStyle='rgba(255,255,255,'+(.15+((i*37)%10)/20)+')';x.fillRect((i*97)%W,(i*53)%H,1,1)}
+  const sx=40,sc=(W-90)/1.52,ey=H/2;const sun=x.createRadialGradient(sx,ey,4,sx,ey,34);sun.addColorStop(0,'#fff6d8');sun.addColorStop(.5,'#ffb54a');sun.addColorStop(1,'rgba(255,120,40,0)');x.fillStyle=sun;x.beginPath();x.arc(sx,ey,34,0,7);x.fill();
+  x.lineWidth=1;x.strokeStyle='rgba(189,165,148,.3)';x.setLineDash([3,4]);[1,1.52].forEach(r=>{x.beginPath();x.arc(sx,ey,r*sc,-.5,.5);x.stroke()});x.setLineDash([]);
+  const ex=sx+sc,mx=sx+1.52*sc;x.fillStyle='#5aa9e6';x.beginPath();x.arc(ex,ey,7,0,7);x.fill();x.fillStyle='#d9643a';x.beginPath();x.arc(mx,ey,6,0,7);x.fill();
+  x.font='12px Chakra Petch, sans-serif';x.fillStyle='#f5e9df';x.textAlign='center';x.fillText('Sun',sx,ey+50);x.fillText('Earth',ex,ey+26);x.fillText('Mars',mx,ey+26);
+  if(prog>0){const r=prog*1.6*sc;const g=x.createRadialGradient(sx,ey,Math.max(1,r-26),sx,ey,r);g.addColorStop(0,'rgba(255,125,69,0)');g.addColorStop(.7,'rgba(255,125,69,.45)');g.addColorStop(1,'rgba(255,200,150,.9)');
+    x.strokeStyle=g;x.lineWidth=24;x.beginPath();x.arc(sx,ey,Math.max(1,r-12),-.55,.55);x.stroke();
+    if(c){const hrs=prog*1.6*149.6e6/c.speed/3600;x.fillStyle='#f5e9df';x.textAlign='left';x.font='600 14px JetBrains Mono, monospace';x.fillText(`T+${fmt(hrs)} h`,10,20);
+      if(prog*1.6>=1)x.fillText('Earth hit',ex-30,ey-30);if(prog*1.6>=1.52){x.fillStyle='#ff7d45';x.fillText('Mars hit!',mx-36,ey-30)}}}}
+function cmeLaunch(){const c=NASA.cmeFastest[DR.cme]||NASA.cmeFastest[0];cancelAnimationFrame(DR.raf);SFX.whoosh();const t0=performance.now();let hitE=false,hitM=false;
+  (function f(now){const p=Math.min(1,(now-t0)/6000);cmeDraw(p,c);if(p*1.6>=1&&!hitE){hitE=true;SFX.click()}if(p*1.6>=1.52&&!hitM){hitM=true;SFX.alarm()}if(p<1&&$('#cmecv'))DR.raf=requestAnimationFrame(f)})(t0)}
+function windTunnel(){const cv=$('#wtcv');if(!cv)return;const x=cv.getContext('2d'),W=640,H=200,FL=H-24;
+  const TH={earth:{sand:6,walnut:4},mars:{sand:30,walnut:22}};
+  const P=Array.from({length:220},()=>({x:Math.random()*W,y:FL-Math.random()*3,vx:0,vy:0,air:false}));let last=performance.now(),fan=0,stream=0;
+  const upd=()=>{const th=TH[DR.wt.atm][DR.wt.grain],w=DR.wt.wind,on=w>=th;const st=$('#wtstate'),d=$('#wtd');if(!st)return;
+    st.textContent=on?(w>=th*1.4?'Sandstorm!':'Grains hopping'):'Still';st.style.color=on?'var(--rust)':'var(--sky)';
+    d.innerHTML=`${DR.wt.grain==='sand'?'Sand':'Walnut shell'} on ${DR.wt.atm==='mars'?'Mars':'Earth'} starts moving at about <b>${th} m/s</b>. You are blowing <b>${w} m/s</b>.`;
+    if(on&&DR.wt.atm==='mars'&&DR.wt.grain==='sand'&&S&&S.phase==='play'&&!S.labDone){S.labDone=true;S.science+=12;SFX.good();toast('Lab result: sand moves on Mars at about 30 m/s, five times Earth’s 6 m/s. <b>+12 science</b>',5000)}};
+  DR.wtUpd=upd;upd();
+  (function f(now){const dt=Math.min(.04,(now-last)/1000);last=now;if(!$('#wtcv'))return;
+    const th=TH[DR.wt.atm][DR.wt.grain],w=DR.wt.wind,ex=(w-th)/th,g=DR.wt.atm==='mars'?140:360,k=DR.wt.atm==='mars'?.9:3.5,light=DR.wt.grain==='walnut'?1.3:1;
+    fan+=w*dt*.8;stream=(stream+w*dt*6)%40;
+    x.fillStyle='#140d0b';x.fillRect(0,0,W,H);x.fillStyle='#2a1c17';x.fillRect(0,FL,W,H-FL);x.fillStyle='#3a2822';x.fillRect(0,0,W,8);x.fillRect(0,FL,W,3);
+    x.strokeStyle='rgba(143,216,242,.18)';x.lineWidth=1;for(let yy=24;yy<FL-6;yy+=22){x.beginPath();for(let xx=-40+stream;xx<W;xx+=40){x.moveTo(xx,yy);x.lineTo(xx+Math.min(30,w*.8),yy)}x.stroke()}
+    x.save();x.translate(46,H/2-10);x.rotate(fan);x.fillStyle='#bda594';for(let i=0;i<3;i++){x.rotate(Math.PI*2/3);x.fillRect(-3,0,6,34)}x.restore();
+    for(const p of P){if(!p.air&&ex>0&&Math.random()<Math.min(.9,ex*1.6)*dt*3){p.air=true;p.vy=-(40+Math.random()*90)*Math.min(1.6,.5+ex)*light;p.vx=p.vx+w*.5}
+      if(p.air){p.vx+=(w*6-p.vx)*k*.02*light;p.vy+=g*dt/light*1.2;p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.y>=FL){p.y=FL-Math.random()*3;p.air=false;p.vx*=.3;p.vy=0}}
+      else{p.vx*=.9;p.x+=p.vx*dt}
+      if(p.x>W)p.x-=W;if(p.x<0)p.x+=W;
+      x.fillStyle=DR.wt.grain==='walnut'?'#8a5a34':'#e0a46a';x.fillRect(p.x|0,p.y|0,3,3)}
+    x.fillStyle='#bda594';x.font='12px JetBrains Mono, monospace';x.fillText(`${DR.wt.atm==='mars'?'MARS 6 mbar':'EARTH 1013 mbar'} · ${w} m/s`,W-200,22);
+    DR.raf=requestAnimationFrame(f)})(last)}
+
+/* ---- About this project (for judges) ---- */
+function about(){const st=sepStats(30);
+  show(`<div class="card" style="max-width:980px">
+  <div class="row" style="justify-content:space-between"><div><div class="eyebrow">NASA Space Apps 2026 · Build a Junior Astronaut Mission Trainer</div><h2 style="font-size:28px">About Red Frontier</h2></div><button class="ghost" data-act="close" data-focus>Close</button></div>
+  <div class="grid2" style="align-items:start">
+    <div class="sec"><span class="lbl">The problem</span><p>Space lessons for young learners usually either hide the engineering trade-offs or bury them in jargon. Students never <i>feel</i> why a mission succeeds or fails.</p>
+      <span class="lbl">Our solution</span><p>A game where players run a Mars outpost and every choice costs something: mass, money, power, water, crew time or radiation dose. Decisions play out sol by sol in 3D, and the debrief explains what the player’s own choices did.</p></div>
+    <div class="sec"><span class="lbl">How it fits the challenge</span>
+      <div class="check"><span class="ic good">✓</span><span><b>Life support:</b> oxygen, water and food, shipped or made on Mars</span></div>
+      <div class="check"><span class="ic good">✓</span><span><b>Radiation shielding:</b> berm, water wall, polyethylene; real solar storm data</span></div>
+      <div class="check"><span class="ic good">✓</span><span><b>Power:</b> solar vs reactor, batteries, dust, storms, winter heating</span></div>
+      <div class="check"><span class="ic good">✓</span><span><b>Food production:</b> greenhouse, perchlorate washing, grow lights</span></div>
+      <div class="check"><span class="ic good">✓</span><span><b>Not too simple, not too complex:</b> Cadet hints, Commander math</span></div></div>
+  </div>
+  <div class="sec"><span class="lbl">Evidence: data, not guesses</span>
+    <div class="grid3">
+      <div class="fact"><span class="n">${NASA.sepEvents.length} storms</span><span class="d">solar particle storms from NASA DONKI, ${NASA.sepWindow[0]} to ${NASA.sepWindow[1]} (${NASA.sepReadings} readings). The rate sets the in-game storm risk (${Math.round(st.p*100)}% chance per 30 sols).</span></div>
+      <div class="fact"><span class="n">${NASA.cmeCount} CMEs</span><span class="d">from NASA DONKI, ${NASA.cmeWindow[0]} to ${NASA.cmeWindow[1]}. Fastest ${NASA.cmeFastest[0].speed} km/s → ${fmt(227.9e6/NASA.cmeFastest[0].speed/3600)} h to Mars.</span></div>
+      <div class="fact"><span class="n">${Object.keys(NIMG).length} NASA photos</span><span class="d">from images.nasa.gov, each tied to a game mechanic, with links to the official records.</span></div>
+      <div class="fact"><span class="n">0.67 mSv/sol</span><span class="d">Curiosity RAD surface dose, used for outdoor work.</span></div>
+      <div class="fact"><span class="n">0.84 kg O₂</span><span class="d">per astronaut per day; 4 crew use 3.36 kg every sol.</span></div>
+      <div class="fact"><span class="n">10 kW</span><span class="d">fission power goal (NASA Kilopower) ≈ 240 kWh per sol.</span></div></div>
+    <p class="note">Some numbers are scaled for play: panel output, crate mass and the mission dose budget (NASA’s real career limit is 600 mSv). Each one keeps the real ratio and is marked in the field guide.</p></div>
+  <div class="grid2" style="align-items:start">
+    <div class="sec"><span class="lbl">Testing and what we learned</span><p class="note" style="color:var(--fg)">Automated playthroughs of whole missions found real design bugs, and we fixed them: machines staying off after a dust storm (the crew ran out of air), a pre-flight check that was too optimistic, and shelter orders that never ended. Each game also counts quiz answers, so a playtest gives learning data.</p></div>
+    <div class="sec"><span class="lbl">From the expert talk to the game</span><p class="note" style="color:var(--fg)">Sol length, ⅓ gravity, thin CO₂ air, seasons and CO₂ frost, the Phoenix and Curiosity missions, ice 10 m down, sulfates, volcanic regolith, perchlorate and iodine, magnetic field and cosmic rays, walnut-shell wind tunnels, the iron triangle, and five classic engineering trade-offs, all turned into mechanics, quiz questions and badges.</p></div></div>
+  </div>`)}
+
+/* ---------------- Actions ---------------- */
+const ACT={
+  rank(k){const w=S.weights;S=newState(k);S.weights=w;brief()},
+  title(){title()},
+  manifest(){manifest()},
+  inc(k){const c=S.manifest[k]||0;if(c<DEF[k].max)S.manifest[k]=c+1;manifest()},
+  dec(k){const c=S.manifest[k]||0;if(c>0)S.manifest[k]=c-1;manifest()},
+  starter(){S.manifest={...STARTER};manifest()},
+  launch(){launch()},
+  autoplace(){autoPlace()},
+  endsol(){if(S.phase==='deploy'){if(!S.pending.length)beginMission();return}endSol()},
+  task(a){const [i,k]=a.split(':');S.crew[+i].task=k;renderAll()},
+  rtab(t){UI.tab=t;renderAll()},
+  mtab(id){mtab(id)},
+  toggle(id){const m=S.modules.find(x=>x.id===+id);if(m){m.on=!m.on;S.sel=m.id;world.syncModules();renderAll()}},
+  repair(id){const m=S.modules.find(x=>x.id===+id);if(m&&S.spares>0){m.broken=false;S.spares--;award('quality');log(`Repaired the ${DEF[m.type].name} with a spare part.`);renderAll()}},
+  fill(){if(S.water>=400&&!S.waterWall){S.water-=400;S.waterWall=true;award('speed');log('Pumped 400 L of water into the habitat walls as radiation shielding.');world.syncShields();renderAll()}},
+  drain(){if(S.waterWall){S.waterWall=false;S.water+=400;log('Drained the water wall: +400 L to drink, but less shielding.');world.syncShields();renderAll()}},
+  expedition(){if(S.phase==='play'&&!busy)expedition()},
+  grav(v){EXP.setGrav&&EXP.setGrav(+v)},
+  xend(){EXP.finish&&EXP.finish()},
+  evopt(i){chooseOpt(+i)},
+  math(){S.math=!S.math;renderAll()},
+  guide(){if(S&&S.phase!=='title')guide()},
+  fulllog(){if(innerWidth>860)fullLog()},
+  close(){cancelAnimationFrame(DR.raf);if(S&&S.phase==='title'){title();return}hide();renderAll()},
+  dataroom(){dataRoom()},drtab(t){dataRoom(t)},about(){about()},
+  sepdot(i){DR.sep=+i;SFX.click();dataRoom('storms')},
+  cmepick(i){DR.cme=+i;dataRoom('cme')},cmego(){cmeLaunch()},
+  wt(a){const [k,v]=a.split(':');DR.wt[k]=v;modal.querySelectorAll('[data-act=wt]').forEach(b=>{const [kk,vv]=b.dataset.arg.split(':');b.classList.toggle('primary',DR.wt[kk]===vv)});DR.wtUpd&&DR.wtUpd()},
+  sound(){SFX.set(!SFX.on);const b=$('#soundbtn');b.textContent=SFX.on?'Sound on':'Sound off';b.setAttribute('aria-pressed',SFX.on)},
+  speak(){speak(SPEAK_TEXT)},
+  quiz(k){answerQuiz(k)},
+  again(){const r=S.rank,w=S.weights,m=S.manifest;world.reset();S=newState(r);S.weights=w;S.manifest=m;$('#hud').hidden=true;manifest()},
+};
+document.addEventListener('click',e=>{SFX.wake();const b=e.target.closest('[data-act]');if(!b||b.disabled)return;if(!['endsol','evopt','quiz','sepdot','cmego'].includes(b.dataset.act))SFX.click();const f=ACT[b.dataset.act];if(f)f(b.dataset.arg,b)});
+document.addEventListener('input',e=>{const dr=e.target.dataset&&e.target.dataset.dr;
+  if(dr==='sols'){DR.sols=+e.target.value;const st=sepStats(DR.sols);$('#solsv').textContent=DR.sols+' sols';$('#pv').textContent=Math.round(st.p*100)+'%';$('#pd').textContent=`chance of at least one storm (about ${fmt(st.exp,1)} expected), if storms come at last year’s rate.`}
+  if(dr==='wind'){DR.wt.wind=+e.target.value;$('#windv').textContent=DR.wt.wind+' m/s';DR.wtUpd&&DR.wtUpd()}
+  const p=e.target.dataset&&e.target.dataset.prio;if(p){S.weights[p]=+e.target.value;e.target.nextElementSibling.textContent=e.target.value}});
+addEventListener('keydown',e=>{if(e.key==='Enter'&&S&&S.phase==='play'&&modal.hidden&&document.activeElement===document.body){endSol()}});
+
+/* ---------------- Boot ---------------- */
+function start(){
+  modal.hidden=true;
+  const ok=typeof THREE!=='undefined'&&world.init();
+  if(!ok){document.body.insertAdjacentHTML('afterbegin','<p style="position:fixed;top:8px;left:16px;z-index:30;color:#f5c24f;font-size:12px">3D view unavailable on this device. The game still works.</p>')}
+  title();
+  refreshNasa();
+}
+start();
+</script>
+</body></html>
