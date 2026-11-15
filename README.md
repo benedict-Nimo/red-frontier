@@ -4,6 +4,11 @@ NASA Space Apps 2026 challenge: *Build a Junior Astronaut Mission Trainer.*
 
 ## Play and install
 - **Play online:** https://benedict-nimo.github.io/red-frontier/ (free, no login).
+- **Demo videos** (music and English subtitles):
+  - 30-second demo: https://benedict-nimo.github.io/red-frontier/demo/side-quest-30s.mp4
+  - 1-minute demo: https://benedict-nimo.github.io/red-frontier/demo/side-quest-1min.mp4
+
+![Side Quest gameplay](demo/how-to-play.gif)
 - **Install as an app:** press **Install the app** on the title screen. On iPhone or iPad (Safari): Share → **Add to Home Screen**. On Android (Chrome): ⋮ menu → **Install app**. On a computer (Chrome or Edge): the install icon in the address bar. The app opens full-screen and works offline after the first visit.
 - **Slow device?** Graphics are set automatically and drop to a lighter setting if the game runs slowly. You can also choose Auto, High, Medium or Low with the **Graphics** button (top right, or in Help).
 
